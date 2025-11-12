@@ -21,4 +21,23 @@ dist-ssr
 *.ntvs*
 *.njsproj
 *.sln
-*.sw?
+
+# Swift/Xcode (but keep source files)
+*.xcodeproj/*
+!*.xcodeproj/project.pbxproj
+!*.xcodeproj/xcshareddata/
+*.xcworkspace/*
+!*.xcworkspace/contents.xcworkspacedata
+*.xcuserdata
+*.swiftpm
+.DS_Store
+build/
+DerivedData/
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager
+.swiftpm/
+Package.resolved

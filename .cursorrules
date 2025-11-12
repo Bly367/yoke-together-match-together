@@ -1,0 +1,132 @@
+{
+  "version": 1,
+  "project": "Yoke (Two-Man Dating App)",
+  "goals": [
+    "SwiftUI + Supabase iOS app with duo matching and realtime group chat",
+    "Zero duplication of functions or logic (DRY). Reuse shared utilities/components.",
+    "High runtime efficiency and low memory churn (value types when possible, struct Views, lightweight ViewModels).",
+    "Clean, layered architecture that is easy to read and easy to edit."
+  ],
+
+  "global_instructions": [
+    "NEVER duplicate functions or logic. If a function already exists, REUSE it, generalize it, or move it to a shared module (Extensions, Utilities, or a Service) so all call sites use the same implementation.",
+    "Prefer composition over inheritance. Follow SOLID. Keep Views dumb and ViewModels thin but stateful.",
+    "Use async/await, structured concurrency, and cancellation where appropriate. Avoid force-unwrapping, avoid global singletons.",
+    "All Views must be stateless where possible; state belongs in ViewModels (Observable). Avoid heavy work in body; offload to ViewModel or Services.",
+    "Follow a single source of truth for theme: colors, spacing, radii, typography in a shared Theme.",
+    "Model → ViewModel → View flow only. Views never call Services directly; they talk to ViewModels.",
+    "When adding a new feature, check Components/, Utilities/, and Services/ for existing helpers before writing new code.",
+    "All new public APIs must include brief doc comments explaining intent, parameters, and side effects.",
+    "Prefer pure functions and small units. Extract repeated View snippets into Components/. Extract repeated queries/data transforms into Utilities/ or Services/.",
+    "All database and network access goes through Services/. Use protocols + dependency injection so ViewModels can be tested."
+  ],
+
+  "file_rules": [
+    {
+      "pattern": "Views/**.swift",
+      "instructions": [
+        "Use struct Views with small, readable bodies. Break large bodies into private subviews.",
+        "NEVER duplicate View modifiers; extract repeated chains into View extensions or a reusable Component.",
+        "No business logic in Views. Forward user intents to ViewModels.",
+        "Use @MainActor ViewModels and @StateObject / @ObservedObject correctly."
+      ]
+    },
+    {
+      "pattern": "ViewModels/**.swift",
+      "instructions": [
+        "Single-responsibility. Expose clear intents (e.g., likeDuo(), sendMessage(), loadNextPage()).",
+        "No duplication of Supabase calls; go through Services.",
+        "Avoid reference cycles. Use weak self in closures. Prefer non-escaping async/await functions.",
+        "Cache where it matters (e.g., memoized transforms) but measure before optimizing prematurely."
+      ]
+    },
+    {
+      "pattern": "Services/**.swift",
+      "instructions": [
+        "Define a protocol first (e.g., MatchingServiceProtocol). Implement a concrete class (e.g., SupabaseMatchingService).",
+        "Keep all queries/util functions DRY in this layer. If a new call resembles an existing one, generalize the existing function.",
+        "Return Result<T, Error> or throw; never silently fail.",
+        "Centralize retry/backoff and connectivity checks in a small shared helper; do not repeat per-call logic."
+      ]
+    },
+    {
+      "pattern": "Models/**.swift",
+      "instructions": [
+        "Use value types (struct) with Codable. Keep models dumb (no business logic).",
+        "Keep identifiers consistent (uuid strings where applicable).",
+        "Add lightweight computed properties only (formatting, derived values)."
+      ]
+    },
+    {
+      "pattern": "Views/Components/**.swift",
+      "instructions": [
+        "Any UI pattern used 2+ times must be a Component (e.g., PrimaryButton, DuoCard, ChatBubble).",
+        "Components must be generic-friendly and configurable via input params. No business logic here."
+      ]
+    },
+    {
+      "pattern": "Utilities/**.swift",
+      "instructions": [
+        "House small cross-cutting helpers (formatting, date utils, retry policies, image cache).",
+        "If a helper exists, extend it—do not create siblings that do the same thing."
+      ]
+    },
+    {
+      "pattern": "Theme/**.swift",
+      "instructions": [
+        "Centralize Colors, Spacing, Typography, CornerRadius. All Views/components consume Theme, not hard-coded values.",
+        "If a color/spacing repeats, add it to Theme first."
+      ]
+    }
+  ],
+
+  "rewrite_rules": [
+    {
+      "trigger": "duplicate logic detected",
+      "action": "Extract to Utilities/ or Services/ with a single generalized function; update all call sites accordingly."
+    },
+    {
+      "trigger": "repeated view modifier chains",
+      "action": "Create a View extension or Component that encapsulates the styling; replace duplicates."
+    },
+    {
+      "trigger": "similar network/database queries",
+      "action": "Create a single parameterized function in the corresponding Service; deprecate duplicates."
+    }
+  ],
+
+  "style_guide": {
+    "swift": {
+      "naming": "lowerCamelCase for vars/functions, UpperCamelCase for types. Clear, intention-revealing names.",
+      "docs": "Use /// for public APIs. Add short rationale for non-trivial private helpers.",
+      "errors": "Use Error enums per module (e.g., MatchingError). Provide human-friendly messages at the ViewModel level.",
+      "concurrency": "Prefer async/await; annotate @MainActor where UI-bound. Use Task.cancel() in deinit or onDisappear when needed.",
+      "testing": "Public protocols for Services to enable mocking. Keep logic testable without UI."
+    }
+  },
+
+  "generation_recipes": [
+    {
+      "name": "CreateView+ViewModel",
+      "prompt": "Generate a SwiftUI View and a matching ViewModel. View must be a small struct, stateless except for bindings to ViewModel. ViewModel must be @MainActor, Observable, and depend on protocol-based Services injected via initializer. No direct service calls inside View; all through ViewModel intents."
+    },
+    {
+      "name": "AddServiceProtocol",
+      "prompt": "Create a Service protocol (e.g., MatchingServiceProtocol) and a concrete Supabase implementation file. Move all similar/duplicate query code into one parameterized function. Provide unit-test-friendly signatures."
+    },
+    {
+      "name": "RefactorToDRY",
+      "prompt": "Identify repeated functions or view modifiers. Extract them into Utilities/, Theme/, or Components/ respectively. Replace all duplicates across the codebase. Maintain identical behavior and add brief docs."
+    }
+  ],
+
+  "acceptance_criteria": [
+    "No duplicate functions across files. Cursor must refactor to a single shared implementation if any are introduced.",
+    "All theme values used via Theme/, not hard-coded.",
+    "Views contain no business logic or network calls.",
+    "All Services implement a protocol and are injected; no hard singletons.",
+    "Public APIs and non-trivial helpers have concise doc comments.",
+    "Builds cleanly with Swift 6 mode; no deprecated APIs for iOS 17+."
+  ]
+}
+
