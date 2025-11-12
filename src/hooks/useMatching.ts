@@ -1,5 +1,5 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo } from 'react';
 import {
   swipeOnDuo,
   getUserMatches,
@@ -13,6 +13,9 @@ import {
 } from '@/services/matching.service';
 import { useUserDuos } from './useDuos';
 import { useAuth } from './useAuth';
+import { notifyNewMatch, shouldShowNotification, areNotificationsEnabled } from '@/lib/notifications';
+import { useViewing } from '@/contexts/ViewingContext';
+import { getOtherDuo, getMatchName } from '@/lib/utils';
 
 /**
  * Query keys
@@ -28,8 +31,15 @@ const MATCH_QUERY_KEY = (duo1Id: string, duo2Id: string) =>
 export function useMatches() {
   const { user } = useAuth();
   const { data: duos } = useUserDuos();
+  const { currentMatchId } = useViewing();
   const queryClient = useQueryClient();
   const unsubscribeRef = useRef<(() => void) | null>(null);
+
+  // Memoize user duo IDs for O(1) lookup
+  const userDuoIdsSet = useMemo(() => {
+    if (!duos || duos.length === 0) return new Set<string>();
+    return new Set(duos.map(d => d.id));
+  }, [duos]);
 
   const query = useQuery({
     queryKey: MATCHES_QUERY_KEY(user?.id || ''),
@@ -42,6 +52,23 @@ export function useMatches() {
     if (!user?.id || !duos || duos.length === 0) return;
 
     const unsubscribe = subscribeToMatches(user.id, (newMatch) => {
+      // Show notification if:
+      // 1. App is in background or tab not focused
+      // 2. User is not currently viewing matches page (we track this via currentMatchId being null when on matches page)
+      // 3. Notifications are enabled
+      const shouldNotify = 
+        shouldShowNotification() &&
+        currentMatchId === null && // Not viewing a specific match
+        areNotificationsEnabled();
+
+      if (shouldNotify) {
+        const otherDuo = getOtherDuo(newMatch, userDuoIdsSet);
+        if (otherDuo) {
+          const otherDuoName = getMatchName(newMatch, userDuoIdsSet);
+          notifyNewMatch(otherDuoName);
+        }
+      }
+
       // Update the matches query cache with the new match
       queryClient.setQueryData(MATCHES_QUERY_KEY(user.id), (old: Match[] = []) => {
         // Check if match already exists to avoid duplicates
@@ -59,7 +86,7 @@ export function useMatches() {
         unsubscribeRef.current = null;
       }
     };
-  }, [user?.id, duos, queryClient]);
+  }, [user?.id, duos, queryClient, currentMatchId, userDuoIdsSet]);
 
   return query;
 }

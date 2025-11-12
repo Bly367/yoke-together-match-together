@@ -9,6 +9,7 @@ import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
 import { RouteTransition } from "@/components/RouteTransition";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { ViewingProvider } from "@/contexts/ViewingContext";
 import { useDefaultKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useExpireDuoRequests } from "@/hooks/useExpireDuoRequests";
 import { ROUTES } from "@/lib/routes";
@@ -28,6 +29,7 @@ const Matches = lazy(() => import("./pages/Matches"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Chat = lazy(() => import("./pages/Chat"));
 const Profile = lazy(() => import("./pages/Profile"));
+const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 /**
@@ -131,6 +133,14 @@ const AppContent = () => {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path={ROUTES.NOTIFICATION_SETTINGS}
+              element={
+                <ProtectedRoute>
+                  <NotificationSettings />
+                </ProtectedRoute>
+              }
+            />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path={ROUTES.NOT_FOUND} element={<NotFound />} />
         </Routes>
@@ -143,14 +153,16 @@ const App = () => (
   <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <SessionTimeoutWarning />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
-        </TooltipProvider>
+        <ViewingProvider>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <SessionTimeoutWarning />
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </TooltipProvider>
+        </ViewingProvider>
       </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>

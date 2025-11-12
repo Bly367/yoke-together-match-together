@@ -14,6 +14,9 @@ import {
   type Message,
   type MessagePaginationOptions,
 } from '@/services/chat.service';
+import { useAuth } from './useAuth';
+import { notifyNewMessage, shouldShowNotification, areNotificationsEnabled } from '@/lib/notifications';
+import { useViewing } from '@/contexts/ViewingContext';
 
 /**
  * Query keys
@@ -220,6 +223,8 @@ export function useMessageSubscription(matchId: string | null, enabled: boolean 
  */
 export function useAllMatchMessagesSubscription(matchIds: string[], enabled: boolean = true) {
   const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const { currentChatId } = useViewing();
   const unsubscribeRef = useRef<(() => void) | null>(null);
   
   // Create a stable sorted array for the query key
@@ -238,6 +243,24 @@ export function useAllMatchMessagesSubscription(matchIds: string[], enabled: boo
     }
 
     const unsubscribe = subscribeToAllMatchMessages(sortedMatchIds, (message) => {
+      // Show notification if:
+      // 1. Message is not from current user
+      // 2. App is in background or tab not focused
+      // 3. User is not currently viewing this chat
+      const shouldNotify = 
+        message.sender_id !== user?.id &&
+        shouldShowNotification() &&
+        currentChatId !== message.match_id &&
+        areNotificationsEnabled();
+
+      if (shouldNotify && message.sender?.name) {
+        notifyNewMessage(
+          message.sender.name,
+          message.content || '',
+          message.match_id
+        );
+      }
+
       // Update lastMessages cache using the same query key format as the query
       queryClient.setQueryData(LAST_MESSAGES_QUERY_KEY(sortedMatchIds), (old: Record<string, Message | null> = {}) => {
         const currentLastMessage = old[message.match_id];
@@ -263,7 +286,7 @@ export function useAllMatchMessagesSubscription(matchIds: string[], enabled: boo
         unsubscribeRef.current = null;
       }
     };
-  }, [sortedMatchIds, enabled, queryClient]); // Removed matchIds from deps - sortedMatchIds already depends on it
+  }, [sortedMatchIds, enabled, queryClient, user?.id, currentChatId]); // Removed matchIds from deps - sortedMatchIds already depends on it
 }
 
 /**

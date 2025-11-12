@@ -14,6 +14,7 @@ export const ROUTES = {
   MATCHES: "/matches",
   MESSAGES: "/messages",
   PROFILE: "/profile",
+  NOTIFICATION_SETTINGS: "/notification-settings",
   NOT_FOUND: "*",
   /**
    * Base path for chat routes
@@ -58,5 +59,6 @@ export const STATIC_ROUTES = [
   ROUTES.MATCHES,
   ROUTES.MESSAGES,
   ROUTES.PROFILE,
+  ROUTES.NOTIFICATION_SETTINGS,
 ] as const;
 

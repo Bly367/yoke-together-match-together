@@ -24,6 +24,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { VirtualizedMessageList } from "@/components/VirtualizedMessageList";
 import { MessageBubble } from "@/components/MessageBubble";
 import { formatDate } from "@/lib/utils";
+import { useViewing } from "@/contexts/ViewingContext";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -36,7 +37,19 @@ const Chat = () => {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [attachmentPreview, setAttachmentPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const messageInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
+  const { setCurrentChatId } = useViewing();
+
+  // Track current chat for notification purposes
+  useEffect(() => {
+    if (matchId) {
+      setCurrentChatId(matchId);
+    }
+    return () => {
+      setCurrentChatId(null);
+    };
+  }, [matchId, setCurrentChatId]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(600);
@@ -285,6 +298,12 @@ const Chat = () => {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+      
+      // Refocus the message input after sending
+      // Use setTimeout to ensure the DOM has updated
+      setTimeout(() => {
+        messageInputRef.current?.focus();
+      }, 0);
       
       // Scroll to bottom after sending message
       // The useEffect hooks will handle scrolling automatically when messages update
@@ -620,6 +639,7 @@ const Chat = () => {
             
             <div className="flex-1 relative">
               <Input
+                ref={messageInputRef}
                 value={message}
                 onChange={(e) => {
                   if (e.target.value.length <= MAX_MESSAGE_LENGTH) {
