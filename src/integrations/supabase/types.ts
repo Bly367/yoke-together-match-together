@@ -1,3 +1,19 @@
+/**
+ * Supabase Database Types
+ * 
+ * ⚠️  IMPORTANT: This file should be generated from your Supabase database schema.
+ * 
+ * To generate types:
+ *   1. Install Supabase CLI: npm install -g supabase
+ *   2. Link your project: supabase link --project-ref YOUR_PROJECT_REF
+ *   3. Generate types: npm run types:generate
+ * 
+ * See GENERATE_TYPES.md for detailed instructions.
+ * 
+ * Current state: Types are empty (not generated yet).
+ * Tables, Views, Functions, and Enums will be populated after running type generation.
+ */
+
 export type Json =
   | string
   | number

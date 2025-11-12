@@ -99,6 +99,80 @@ Component → Hook → Service → Supabase
 - Hooks use services for operations
 - Services use Supabase client for API calls
 
+### Architecture Diagram
+
+```mermaid
+graph TB
+    subgraph "Frontend Layer"
+        A[Pages/Components] --> B[Hooks]
+        B --> C[Services]
+        C --> D[Supabase Client]
+    end
+    
+    subgraph "Backend Layer"
+        D --> E[Supabase Auth]
+        D --> F[Supabase Database]
+        D --> G[Supabase Storage]
+        D --> H[Supabase Realtime]
+    end
+    
+    subgraph "Data Flow"
+        I[User Action] --> A
+        A --> B
+        B --> C
+        C --> D
+        D --> E
+        D --> F
+        D --> G
+        D --> H
+        H --> B
+        B --> A
+        A --> J[UI Update]
+    end
+    
+    style A fill:#e1f5ff
+    style B fill:#fff4e1
+    style C fill:#ffe1f5
+    style D fill:#e1ffe1
+```
+
+### Component Architecture
+
+```
+src/
+├── components/       # Reusable UI components
+│   ├── ui/          # shadcn/ui components
+│   └── ...          # Custom components
+├── hooks/           # Custom React hooks (React Query)
+├── services/        # Service functions (Supabase operations)
+├── lib/             # Utility functions
+├── pages/           # Page components
+└── integrations/    # Supabase client and types
+```
+
+### Service Layer Pattern
+
+All data operations follow this pattern:
+
+1. **Service Functions** (`services/*.ts`): Pure functions that interact with Supabase
+2. **React Hooks** (`hooks/*.ts`): Wrap services with React Query for caching, loading states, and error handling
+3. **Components** (`pages/*.tsx`, `components/*.tsx`): Use hooks to get data and handle user interactions
+
+**Example:**
+```typescript
+// Service (services/auth.service.ts)
+export async function signIn(email: string, password: string) { ... }
+
+// Hook (hooks/useAuth.ts)
+export function useSignIn() {
+  return useMutation({ mutationFn: signIn });
+}
+
+// Component (pages/Auth.tsx)
+const signInMutation = useSignIn();
+await signInMutation.mutateAsync({ email, password });
+```
+
 ## Development
 
 ### Running the app
@@ -128,6 +202,20 @@ See `supabase/migrations/001_initial_schema.sql` for the complete database schem
 - `VITE_SUPABASE_URL` - Supabase project URL
 - `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase anonymous key
 
+## Documentation
+
+### Essential Docs
+- **[API Documentation](./API.md)** - Complete API reference for all service functions
+- **[Architecture Documentation](./ARCHITECTURE.md)** - System architecture and design decisions
+- **[Product Requirements Document](./PRD.md)** - Complete product requirements and specifications
+- **[Setup Instructions](./SETUP_INSTRUCTIONS.md)** - Detailed setup guide
+- **[Database Guide](./DATABASE_GUIDE.md)** - Database schema and RLS policies
+- **[Troubleshooting Guide](./TROUBLESHOOTING.md)** - Common issues and solutions
+- **[Contributing Guide](./CONTRIBUTING.md)** - How to contribute to the project
+
+### Documentation Index
+See [docs/INDEX.md](./docs/INDEX.md) for a complete list of all documentation files.
+
 ## Contributing
 
 1. Follow the `.cursorrules` guidelines
@@ -135,6 +223,8 @@ See `supabase/migrations/001_initial_schema.sql` for the complete database schem
 3. Use TypeScript for type safety
 4. Use React Query for data fetching
 5. Write reusable components and hooks
+6. See [API.md](./API.md) for service function documentation
+7. See [ARCHITECTURE.md](./ARCHITECTURE.md) for architectural patterns
 
 ## License
 

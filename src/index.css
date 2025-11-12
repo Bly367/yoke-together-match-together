@@ -60,33 +60,56 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 30 15% 12%;
-    --foreground: 45 100% 99%;
+    /* Dark mode background - warmer, richer dark tone */
+    --background: 30 20% 8%;
+    --foreground: 45 15% 95%;
 
-    --card: 30 15% 15%;
-    --card-foreground: 45 100% 99%;
+    /* Cards - more contrast from background, warmer tone */
+    --card: 30 18% 12%;
+    --card-foreground: 45 15% 95%;
 
-    --popover: 30 15% 15%;
-    --popover-foreground: 45 100% 99%;
+    --popover: 30 18% 12%;
+    --popover-foreground: 45 15% 95%;
 
-    --primary: 46 95% 64%;
-    --primary-foreground: 30 40% 15%;
+    /* Primary - slightly warmer yellow for dark mode */
+    --primary: 48 96% 68%;
+    --primary-foreground: 30 25% 10%;
 
-    --secondary: 30 40% 25%;
-    --secondary-foreground: 45 100% 99%;
+    /* Secondary - warmer, more visible peach tone */
+    --secondary: 30 35% 22%;
+    --secondary-foreground: 45 15% 95%;
 
-    --muted: 30 15% 20%;
-    --muted-foreground: 30 20% 70%;
+    /* Muted - better contrast for subtle elements */
+    --muted: 30 15% 16%;
+    --muted-foreground: 30 10% 75%;
 
-    --accent: 46 95% 64%;
-    --accent-foreground: 30 40% 15%;
+    /* Accent - matches primary */
+    --accent: 48 96% 68%;
+    --accent-foreground: 30 25% 10%;
 
-    --destructive: 0 62.8% 50%;
-    --destructive-foreground: 45 100% 99%;
+    /* Destructive - slightly brighter for visibility */
+    --destructive: 0 72% 58%;
+    --destructive-foreground: 45 15% 95%;
 
-    --border: 30 15% 25%;
-    --input: 30 15% 25%;
-    --ring: 46 95% 64%;
+    /* Borders and inputs - more visible separation */
+    --border: 30 15% 20%;
+    --input: 30 15% 18%;
+    --ring: 48 96% 68%;
+
+    /* Dark mode custom colors */
+    --yolk-yellow: 48 96% 68%;
+    --cream: 30 20% 8%;
+    --peach: 30 35% 22%;
+    --warm-brown: 30 10% 75%;
+    --soft-gray: 30 15% 20%;
+
+    /* Dark mode gradients - subtle, warm gradients */
+    --gradient-yolk: linear-gradient(135deg, hsl(48 96% 68%) 0%, hsl(30 40% 28%) 100%);
+    --gradient-soft: linear-gradient(180deg, hsl(30 20% 8%) 0%, hsl(30 18% 12%) 100%);
+
+    /* Dark mode shadows - softer, more subtle */
+    --shadow-soft: 0 4px 20px hsl(0 0% 0% / 0.3);
+    --shadow-card: 0 8px 30px hsl(0 0% 0% / 0.4);
   }
 }
 
@@ -95,7 +118,21 @@ All colors MUST be HSL.
     @apply border-border;
   }
 
+  html {
+    @apply overflow-y-auto;
+  }
+
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground overflow-y-auto;
+    min-height: 100vh;
+  }
+
+  #root {
+    min-height: 100vh;
+  }
+
+  /* Dark mode color scheme */
+  .dark {
+    color-scheme: dark;
   }
 }

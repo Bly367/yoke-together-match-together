@@ -1,0 +1,14 @@
+{
+  "name": "yoke-database-scripts",
+  "version": "1.0.0",
+  "description": "Database utility scripts for Yoke app",
+  "scripts": {
+    "check-db": "tsx check-database.ts"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.81.1",
+    "dotenv": "^16.4.5",
+    "tsx": "^4.7.0"
+  }
+}
+

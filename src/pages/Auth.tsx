@@ -1,55 +1,103 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
+import { Progress } from "@/components/ui/progress";
+import { useNavigate, useLocation, Link } from "react-router-dom";
 import { toast } from "sonner";
 import chickMascot from "@/assets/chick-mascot.png";
 import { Loader2 } from "lucide-react";
+import { useSignUp, useSignIn } from "@/hooks/useAuth";
+import { ROUTES } from "@/lib/routes";
+import { isValidEmail, getPasswordStrength } from "@/lib/utils";
 
 const Auth = () => {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [loading, setLoading] = useState(false);
+  const [emailError, setEmailError] = useState("");
+  const [passwordStrength, setPasswordStrength] = useState({ score: 0, feedback: "" });
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const signUpMutation = useSignUp();
+  const signInMutation = useSignIn();
+
+  // Get redirect path from location state, sessionStorage, or default to profile
+  const getRedirectPath = (): string => {
+    // Check location state first (from ProtectedRoute)
+    const stateRedirect = (location.state as { from?: string })?.from;
+    if (stateRedirect) return stateRedirect;
+    
+    // Check sessionStorage as fallback
+    const storedRedirect = sessionStorage.getItem('redirectTo');
+    if (storedRedirect) {
+      sessionStorage.removeItem('redirectTo');
+      return storedRedirect;
+    }
+    
+    // Default to profile
+    return ROUTES.PROFILE;
+  };
+  
+  const redirectTo = getRedirectPath();
+
+  // Validate email on change
+  useEffect(() => {
+    if (email && !isLogin) {
+      if (!isValidEmail(email)) {
+        setEmailError("Please enter a valid email address");
+      } else {
+        setEmailError("");
+      }
+    } else {
+      setEmailError("");
+    }
+  }, [email, isLogin]);
+
+  // Calculate password strength on change
+  useEffect(() => {
+    if (password && !isLogin) {
+      setPasswordStrength(getPasswordStrength(password));
+    } else {
+      setPasswordStrength({ score: 0, feedback: "" });
+    }
+  }, [password, isLogin]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
+
+    // Validate email
+    if (!isValidEmail(email)) {
+      setEmailError("Please enter a valid email address");
+      return;
+    }
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        if (error) throw error;
+        await signInMutation.mutateAsync({ email, password });
         toast.success("Welcome back!");
-        navigate("/profile-setup");
+        navigate(redirectTo);
       } else {
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            data: {
-              name,
-            },
-            emailRedirectTo: `${window.location.origin}/profile-setup`,
-          },
-        });
-        if (error) throw error;
-        toast.success("Account created! Please check your email.");
-        navigate("/profile-setup");
+        if (!name.trim()) {
+          toast.error("Please enter your name");
+          return;
+        }
+        if (passwordStrength.score < 2) {
+          toast.error("Password is too weak. Please choose a stronger password.");
+          return;
+        }
+        await signUpMutation.mutateAsync({ email, password, name });
+        toast.success("Account created successfully!");
+        navigate(ROUTES.PROFILE_SETUP);
       }
     } catch (error: any) {
       toast.error(error.message || "An error occurred");
-    } finally {
-      setLoading(false);
     }
   };
+
+  const loading = signUpMutation.isPending || signInMutation.isPending;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center p-4">
@@ -100,12 +148,25 @@ const Auth = () => {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="rounded-2xl"
+                className={`rounded-2xl ${emailError ? "border-destructive" : ""}`}
               />
+              {emailError && (
+                <p className="text-sm text-destructive">{emailError}</p>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                {isLogin && (
+                  <Link
+                    to={ROUTES.FORGOT_PASSWORD}
+                    className="text-sm text-primary hover:underline"
+                  >
+                    Forgot password?
+                  </Link>
+                )}
+              </div>
               <Input
                 id="password"
                 type="password"
@@ -115,6 +176,36 @@ const Auth = () => {
                 required
                 className="rounded-2xl"
               />
+              {!isLogin && password && (
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Progress 
+                      value={(passwordStrength.score / 4) * 100} 
+                      className="h-1.5 flex-1"
+                    />
+                    <span className={`text-xs font-medium ${
+                      passwordStrength.score === 0 ? "text-muted-foreground" :
+                      passwordStrength.score === 1 ? "text-destructive" :
+                      passwordStrength.score === 2 ? "text-yellow-500" :
+                      passwordStrength.score === 3 ? "text-blue-500" :
+                      "text-green-500"
+                    }`}>
+                      {passwordStrength.score === 0 ? "Very Weak" :
+                       passwordStrength.score === 1 ? "Weak" :
+                       passwordStrength.score === 2 ? "Fair" :
+                       passwordStrength.score === 3 ? "Good" :
+                       "Strong"}
+                    </span>
+                  </div>
+                  {passwordStrength.feedback && (
+                    <p className={`text-xs ${
+                      passwordStrength.score < 2 ? "text-destructive" : "text-muted-foreground"
+                    }`}>
+                      {passwordStrength.feedback}
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
 
             <Button 

@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import chickMascot from "@/assets/chick-mascot.png";
 import yolkGradient from "@/assets/yolk-gradient.png";
 import { Heart, Users, MessageCircle, Sparkles } from "lucide-react";
+import { ROUTES } from "@/lib/routes";
 
 const Index = () => {
   return (
@@ -43,12 +44,12 @@ const Index = () => {
 
           {/* CTA Buttons */}
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center pt-6">
-            <Link to="/auth">
+            <Link to={ROUTES.AUTH}>
               <Button variant="yolk" size="lg" className="w-full sm:w-auto animate-hatch">
                 Get Started
               </Button>
             </Link>
-            <Link to="/auth">
+            <Link to={ROUTES.AUTH}>
               <Button variant="outline" size="lg" className="w-full sm:w-auto">
                 Learn More
               </Button>
@@ -98,7 +99,7 @@ const Index = () => {
           <p className="text-lg text-foreground/70">
             Join thousands of duos already making connections
           </p>
-          <Link to="/auth">
+          <Link to={ROUTES.AUTH}>
             <Button variant="yolk" size="lg" className="animate-wiggle hover:animate-none">
               Start Your Journey
             </Button>
