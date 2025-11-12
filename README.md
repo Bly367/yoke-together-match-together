@@ -1,73 +1,141 @@
-# Welcome to your Lovable project
+# Yoke - Two-Man Dating App
 
-## Project info
+A React + TypeScript + Supabase web app for duo matching and realtime group chat.
 
-**URL**: https://lovable.dev/projects/80940bd3-a6cc-4570-8ad9-403ab27adb3b
+## Features
 
-## How can I edit this code?
+- ✅ Authentication (email/password)
+- ✅ Profile creation
+- ✅ Duo creation (pair with friend)
+- ✅ Swipe-based matching
+- ✅ Realtime chat
+- ✅ Match management
 
-There are several ways of editing your application.
+## Tech Stack
 
-**Use Lovable**
+- **Frontend**: React 18 + TypeScript
+- **UI**: shadcn/ui + Tailwind CSS
+- **Backend**: Supabase (PostgreSQL + Realtime + Storage)
+- **State Management**: React Query (TanStack Query)
+- **Routing**: React Router
+- **Build Tool**: Vite
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/80940bd3-a6cc-4570-8ad9-403ab27adb3b) and start prompting.
+## Getting Started
 
-Changes made via Lovable will be committed automatically to this repo.
+### Prerequisites
 
-**Use your preferred IDE**
+- Node.js 18+ and npm
+- Supabase account and project
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+### Installation
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+1. Clone the repository:
+```bash
+git clone <your-repo-url>
+cd yoke-together-match-together
+```
 
-Follow these steps:
+2. Install dependencies:
+```bash
+npm install
+```
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
+3. Create `.env` file:
+```bash
+cp .env.example .env
+```
 
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
+4. Add your Supabase credentials to `.env`:
+```env
+VITE_SUPABASE_URL=your_supabase_url
+VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_key
+```
 
-# Step 3: Install the necessary dependencies.
-npm i
+5. Apply database schema:
+   - Go to Supabase Dashboard → SQL Editor
+   - Run the SQL from `supabase/migrations/001_initial_schema.sql`
 
-# Step 4: Start the development server with auto-reloading and an instant preview.
+6. Create storage bucket:
+   - Go to Supabase Dashboard → Storage
+   - Create a bucket named "photos"
+   - Set it to public (or configure RLS policies)
+
+7. Run the development server:
+```bash
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+8. Open [http://localhost:5173](http://localhost:5173) in your browser.
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+## Project Structure
 
-**Use GitHub Codespaces**
+```
+src/
+├── components/       # Reusable UI components
+│   ├── ui/          # shadcn/ui components
+│   └── ...          # Custom components
+├── hooks/           # Custom React hooks
+├── services/        # Service functions for Supabase
+├── lib/             # Utility functions
+├── pages/           # Page components
+├── integrations/    # Supabase client and types
+└── assets/          # Static assets
+```
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+## Architecture
 
-## What technologies are used for this project?
+- **Components**: Presentational components (pages and UI components)
+- **Hooks**: Data fetching and state management (using React Query)
+- **Services**: Supabase operations (authentication, database, storage)
+- **Lib**: Utility functions (formatting, validation, type guards)
 
-This project is built with:
+### Data Flow
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+```
+Component → Hook → Service → Supabase
+```
 
-## How can I deploy this project?
+- Components use hooks for data
+- Hooks use services for operations
+- Services use Supabase client for API calls
 
-Simply open [Lovable](https://lovable.dev/projects/80940bd3-a6cc-4570-8ad9-403ab27adb3b) and click on Share -> Publish.
+## Development
 
-## Can I connect a custom domain to my Lovable project?
+### Running the app
 
-Yes, you can!
+```bash
+npm run dev
+```
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
+### Building for production
 
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+```bash
+npm run build
+```
+
+### Linting
+
+```bash
+npm run lint
+```
+
+## Database Schema
+
+See `supabase/migrations/001_initial_schema.sql` for the complete database schema.
+
+## Environment Variables
+
+- `VITE_SUPABASE_URL` - Supabase project URL
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase anonymous key
+
+## Contributing
+
+1. Follow the `.cursorrules` guidelines
+2. Keep code DRY (Don't Repeat Yourself)
+3. Use TypeScript for type safety
+4. Use React Query for data fetching
+5. Write reusable components and hooks
+
+## License
+
+[Your License Here]

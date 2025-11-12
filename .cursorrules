@@ -2,80 +2,75 @@
   "version": 1,
   "project": "Yoke (Two-Man Dating App)",
   "goals": [
-    "SwiftUI + Supabase iOS app with duo matching and realtime group chat",
+    "React + TypeScript + Supabase web app with duo matching and realtime group chat",
     "Zero duplication of functions or logic (DRY). Reuse shared utilities/components.",
-    "High runtime efficiency and low memory churn (value types when possible, struct Views, lightweight ViewModels).",
+    "High runtime efficiency and optimized performance (React best practices, code splitting, memoization).",
     "Clean, layered architecture that is easy to read and easy to edit."
   ],
 
   "global_instructions": [
-    "NEVER duplicate functions or logic. If a function already exists, REUSE it, generalize it, or move it to a shared module (Extensions, Utilities, or a Service) so all call sites use the same implementation.",
-    "Prefer composition over inheritance. Follow SOLID. Keep Views dumb and ViewModels thin but stateful.",
-    "Use async/await, structured concurrency, and cancellation where appropriate. Avoid force-unwrapping, avoid global singletons.",
-    "All Views must be stateless where possible; state belongs in ViewModels (Observable). Avoid heavy work in body; offload to ViewModel or Services.",
-    "Follow a single source of truth for theme: colors, spacing, radii, typography in a shared Theme.",
-    "Model → ViewModel → View flow only. Views never call Services directly; they talk to ViewModels.",
-    "When adding a new feature, check Components/, Utilities/, and Services/ for existing helpers before writing new code.",
-    "All new public APIs must include brief doc comments explaining intent, parameters, and side effects.",
-    "Prefer pure functions and small units. Extract repeated View snippets into Components/. Extract repeated queries/data transforms into Utilities/ or Services/.",
-    "All database and network access goes through Services/. Use protocols + dependency injection so ViewModels can be tested."
+    "NEVER duplicate functions or logic. If a function already exists, REUSE it, generalize it, or move it to a shared module (lib/, hooks/, services/, or components/) so all call sites use the same implementation.",
+    "Prefer composition over inheritance. Follow SOLID principles. Keep components functional and hooks thin but stateful.",
+    "Use async/await, proper error handling, and loading states. Avoid force unwrapping, avoid global singletons.",
+    "All components must be functional and stateless where possible; state belongs in hooks or context. Avoid heavy work in render; offload to hooks or services.",
+    "Follow a single source of truth for theme: colors, spacing, radii, typography in Tailwind config or CSS variables.",
+    "Model → Service → Hook → Component flow. Components never call services directly; they use hooks.",
+    "When adding a new feature, check components/, hooks/, lib/, and services/ for existing helpers before writing new code.",
+    "All new public APIs must include brief JSDoc comments explaining intent, parameters, and side effects.",
+    "Prefer pure functions and small units. Extract repeated component snippets into reusable components. Extract repeated queries/data transforms into hooks or services.",
+    "All database and network access goes through services/ or Supabase client. Use React Query for data fetching and caching."
   ],
 
   "file_rules": [
     {
-      "pattern": "Views/**.swift",
+      "pattern": "src/pages/**/*.tsx",
       "instructions": [
-        "Use struct Views with small, readable bodies. Break large bodies into private subviews.",
-        "NEVER duplicate View modifiers; extract repeated chains into View extensions or a reusable Component.",
-        "No business logic in Views. Forward user intents to ViewModels.",
-        "Use @MainActor ViewModels and @StateObject / @ObservedObject correctly."
+        "Use functional components with small, readable bodies. Break large components into smaller sub-components.",
+        "NEVER duplicate component patterns; extract repeated patterns into reusable components in src/components/.",
+        "No business logic in components. Forward user intents to hooks or services.",
+        "Use React hooks (useState, useEffect, useQuery) correctly. Keep components focused on presentation."
       ]
     },
     {
-      "pattern": "ViewModels/**.swift",
+      "pattern": "src/components/**/*.tsx",
       "instructions": [
-        "Single-responsibility. Expose clear intents (e.g., likeDuo(), sendMessage(), loadNextPage()).",
-        "No duplication of Supabase calls; go through Services.",
-        "Avoid reference cycles. Use weak self in closures. Prefer non-escaping async/await functions.",
-        "Cache where it matters (e.g., memoized transforms) but measure before optimizing prematurely."
+        "Components must be reusable and generic. Accept props for configuration.",
+        "Any UI pattern used 2+ times must be a component (e.g., PrimaryButton, DuoCard, ChatBubble).",
+        "Components must be generic-friendly and configurable via props. No business logic here.",
+        "Use TypeScript interfaces for props. Make props optional where appropriate."
       ]
     },
     {
-      "pattern": "Services/**.swift",
+      "pattern": "src/hooks/**/*.ts",
       "instructions": [
-        "Define a protocol first (e.g., MatchingServiceProtocol). Implement a concrete class (e.g., SupabaseMatchingService).",
+        "Single-responsibility. Expose clear hooks (e.g., useAuth, useMatchmaking, useChat).",
+        "No duplication of Supabase calls; reuse service functions or create shared hooks.",
+        "Use React Query for data fetching, caching, and synchronization.",
+        "Handle loading and error states properly. Return clear, typed data."
+      ]
+    },
+    {
+      "pattern": "src/services/**/*.ts",
+      "instructions": [
+        "Define service functions for Supabase operations. Group related operations together.",
         "Keep all queries/util functions DRY in this layer. If a new call resembles an existing one, generalize the existing function.",
-        "Return Result<T, Error> or throw; never silently fail.",
-        "Centralize retry/backoff and connectivity checks in a small shared helper; do not repeat per-call logic."
+        "Return typed data or throw errors; never silently fail.",
+        "Centralize retry/backoff and error handling in a small shared helper; do not repeat per-call logic."
       ]
     },
     {
-      "pattern": "Models/**.swift",
+      "pattern": "src/lib/**/*.ts",
       "instructions": [
-        "Use value types (struct) with Codable. Keep models dumb (no business logic).",
-        "Keep identifiers consistent (uuid strings where applicable).",
-        "Add lightweight computed properties only (formatting, derived values)."
+        "House small cross-cutting helpers (formatting, date utils, validation, type guards).",
+        "If a helper exists, extend it—do not create siblings that do the same thing.",
+        "Use TypeScript types and interfaces. Export types that are used in multiple places."
       ]
     },
     {
-      "pattern": "Views/Components/**.swift",
+      "pattern": "src/integrations/**/*.ts",
       "instructions": [
-        "Any UI pattern used 2+ times must be a Component (e.g., PrimaryButton, DuoCard, ChatBubble).",
-        "Components must be generic-friendly and configurable via input params. No business logic here."
-      ]
-    },
-    {
-      "pattern": "Utilities/**.swift",
-      "instructions": [
-        "House small cross-cutting helpers (formatting, date utils, retry policies, image cache).",
-        "If a helper exists, extend it—do not create siblings that do the same thing."
-      ]
-    },
-    {
-      "pattern": "Theme/**.swift",
-      "instructions": [
-        "Centralize Colors, Spacing, Typography, CornerRadius. All Views/components consume Theme, not hard-coded values.",
-        "If a color/spacing repeats, add it to Theme first."
+        "Supabase client and type definitions. Keep this minimal and focused.",
+        "Export Supabase client instance. Export generated types from Supabase."
       ]
     }
   ],
@@ -83,50 +78,55 @@
   "rewrite_rules": [
     {
       "trigger": "duplicate logic detected",
-      "action": "Extract to Utilities/ or Services/ with a single generalized function; update all call sites accordingly."
+      "action": "Extract to lib/, hooks/, or services/ with a single generalized function; update all call sites accordingly."
     },
     {
-      "trigger": "repeated view modifier chains",
-      "action": "Create a View extension or Component that encapsulates the styling; replace duplicates."
+      "trigger": "repeated component patterns",
+      "action": "Create a reusable component in src/components/ that encapsulates the pattern; replace duplicates."
     },
     {
-      "trigger": "similar network/database queries",
-      "action": "Create a single parameterized function in the corresponding Service; deprecate duplicates."
+      "trigger": "similar Supabase queries",
+      "action": "Create a single parameterized function in services/; deprecate duplicates."
     }
   ],
 
   "style_guide": {
-    "swift": {
-      "naming": "lowerCamelCase for vars/functions, UpperCamelCase for types. Clear, intention-revealing names.",
-      "docs": "Use /// for public APIs. Add short rationale for non-trivial private helpers.",
-      "errors": "Use Error enums per module (e.g., MatchingError). Provide human-friendly messages at the ViewModel level.",
-      "concurrency": "Prefer async/await; annotate @MainActor where UI-bound. Use Task.cancel() in deinit or onDisappear when needed.",
-      "testing": "Public protocols for Services to enable mocking. Keep logic testable without UI."
+    "typescript": {
+      "naming": "camelCase for vars/functions, PascalCase for types/components. Clear, intention-revealing names.",
+      "docs": "Use JSDoc comments for public functions. Add short rationale for non-trivial private helpers.",
+      "errors": "Use typed errors or Error objects. Provide human-friendly messages at the component level.",
+      "async": "Prefer async/await over promises. Use React Query for data fetching. Handle errors properly.",
+      "testing": "Write tests for services and hooks. Keep logic testable without UI."
+    },
+    "react": {
+      "components": "Use functional components with TypeScript. Use hooks for state and side effects.",
+      "props": "Define props interfaces. Use default props where appropriate. Keep props minimal.",
+      "state": "Use useState for local state, useContext for shared state, React Query for server state.",
+      "effects": "Use useEffect for side effects. Clean up subscriptions and timers. Include proper dependencies."
     }
   },
 
   "generation_recipes": [
     {
-      "name": "CreateView+ViewModel",
-      "prompt": "Generate a SwiftUI View and a matching ViewModel. View must be a small struct, stateless except for bindings to ViewModel. ViewModel must be @MainActor, Observable, and depend on protocol-based Services injected via initializer. No direct service calls inside View; all through ViewModel intents."
+      "name": "CreateComponent+Hook",
+      "prompt": "Generate a React component and a matching custom hook. Component must be a functional component, stateless except for props and hook usage. Hook must handle state and side effects, using React Query for data fetching. No direct Supabase calls inside component; all through hooks."
     },
     {
-      "name": "AddServiceProtocol",
-      "prompt": "Create a Service protocol (e.g., MatchingServiceProtocol) and a concrete Supabase implementation file. Move all similar/duplicate query code into one parameterized function. Provide unit-test-friendly signatures."
+      "name": "AddServiceFunction",
+      "prompt": "Create a service function for Supabase operations. Group related operations together. Move all similar/duplicate query code into one parameterized function. Provide TypeScript types for parameters and return values."
     },
     {
       "name": "RefactorToDRY",
-      "prompt": "Identify repeated functions or view modifiers. Extract them into Utilities/, Theme/, or Components/ respectively. Replace all duplicates across the codebase. Maintain identical behavior and add brief docs."
+      "prompt": "Identify repeated functions or component patterns. Extract them into lib/, hooks/, services/, or components/ respectively. Replace all duplicates across the codebase. Maintain identical behavior and add brief docs."
     }
   ],
 
   "acceptance_criteria": [
     "No duplicate functions across files. Cursor must refactor to a single shared implementation if any are introduced.",
-    "All theme values used via Theme/, not hard-coded.",
-    "Views contain no business logic or network calls.",
-    "All Services implement a protocol and are injected; no hard singletons.",
-    "Public APIs and non-trivial helpers have concise doc comments.",
-    "Builds cleanly with Swift 6 mode; no deprecated APIs for iOS 17+."
+    "All theme values used via Tailwind config or CSS variables, not hard-coded.",
+    "Components contain no business logic or direct Supabase calls.",
+    "All services are typed with TypeScript. Use React Query for data fetching.",
+    "Public APIs and non-trivial helpers have JSDoc comments.",
+    "Builds cleanly with TypeScript. No any types without justification. Proper error handling."
   ]
 }
-
