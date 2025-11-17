@@ -86,9 +86,9 @@ export default defineConfig(({ mode }) => ({
             if (id.includes('@radix-ui')) {
               return undefined; // Keep in main bundle to ensure React is available
             }
-            // Supabase
+            // Supabase - keep in main bundle to avoid initialization order issues
             if (id.includes('@supabase')) {
-              return 'supabase-vendor';
+              return undefined; // Keep in main bundle to prevent circular dependency errors
             }
             // Other node_modules
             return 'vendor';
