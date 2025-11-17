@@ -486,12 +486,30 @@ export async function updateProfile(profile: Partial<UserProfile>): Promise<User
     .update(updateData)
     .eq('id', user.id)
     .select()
-    .single();
+    .maybeSingle();
 
-  // If update fails with "Cannot coerce" or similar, try update without select first
+  // If update succeeds and we have data, return it
+  if (data && !error) {
+    return data;
+  }
+
+  // If update fails with "Cannot coerce", 406, or similar, try update without select first
   // then fetch separately (this handles RLS issues where update works but select fails)
-  if (error && (error.message?.includes('Cannot coerce') || error.message?.includes('single JSON object'))) {
-    logger.warn('Update select failed, trying update without select then fetch', { userId: user.id, error: error.message });
+  if (error || !data) {
+    const errorMessage = error?.message || '';
+    const errorStatus = (error as any)?.status;
+    
+    if (error && (
+      errorMessage.includes('Cannot coerce') || 
+      errorMessage.includes('single JSON object') ||
+      errorStatus === 406
+    )) {
+      logger.warn('Update select failed, trying update without select then fetch', { 
+        userId: user.id, 
+        error: errorMessage,
+        status: errorStatus 
+      });
+    }
     
     // Try update without select
     const { error: updateOnlyError } = await supabase
@@ -503,20 +521,43 @@ export async function updateProfile(profile: Partial<UserProfile>): Promise<User
       logger.error('Update without select also failed', updateOnlyError, { userId: user.id });
       error = updateOnlyError;
     } else {
-      // Update succeeded, now fetch the profile
+      // Update succeeded, now fetch the profile using maybeSingle to handle 406 gracefully
       const { data: fetchedData, error: fetchError } = await supabase
         .from('profiles')
         .select()
         .eq('id', user.id)
-        .single();
+        .maybeSingle();
 
       if (fetchError) {
+        // Handle 406 errors gracefully - update worked but can't fetch due to RLS
+        if (fetchError.status === 406) {
+          logger.warn('Profile update succeeded but fetch returned 406 (RLS issue)', { userId: user.id });
+          // Return a partial profile with the updated data
+          // The user will see the update on next page load
+          return {
+            id: user.id,
+            email: user.email || '',
+            name: user.user_metadata?.name || 'User',
+            ...updateData,
+            created_at: new Date().toISOString(),
+            updated_at: updateData.updated_at,
+          } as UserProfile;
+        }
         logger.error('Failed to fetch profile after update', fetchError, { userId: user.id });
         error = fetchError;
       } else {
         // Success! Return the fetched data
         if (!fetchedData) {
-          throw new Error('Profile update succeeded but fetch returned no data');
+          // Update worked but no data returned - return partial profile
+          logger.warn('Profile update succeeded but fetch returned no data', { userId: user.id });
+          return {
+            id: user.id,
+            email: user.email || '',
+            name: user.user_metadata?.name || 'User',
+            ...updateData,
+            created_at: new Date().toISOString(),
+            updated_at: updateData.updated_at,
+          } as UserProfile;
         }
         return fetchedData;
       }

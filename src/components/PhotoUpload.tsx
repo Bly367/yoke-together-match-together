@@ -9,6 +9,7 @@ import { logger } from '@/lib/logger';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -213,6 +214,9 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
         <DialogContent className="max-w-2xl data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100">
           <DialogHeader>
             <DialogTitle>Crop Your Photo</DialogTitle>
+            <DialogDescription>
+              Adjust the zoom and rotation, then crop your photo to the desired size.
+            </DialogDescription>
           </DialogHeader>
           
           <div className="relative w-full h-[400px] bg-secondary/20 rounded-lg overflow-hidden">
