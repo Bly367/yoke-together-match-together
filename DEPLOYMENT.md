@@ -31,14 +31,19 @@ Vercel is the easiest and fastest way to deploy a Vite + React app.
    - Import your GitHub repository
    - Vercel will auto-detect Vite configuration
 
-4. **Configure environment variables**
-   - In the Vercel project settings, go to "Environment Variables"
-   - Add the following:
-     ```
-     VITE_SUPABASE_URL=your_supabase_project_url
-     VITE_SUPABASE_PUBLISHABLE_KEY=your_supabase_anon_key
-     ```
-   - Make sure to add them for **Production**, **Preview**, and **Development** environments
+4. **Configure environment variables** ⚠️ **CRITICAL**
+   - In the Vercel project settings, go to **Settings → Environment Variables**
+   - Click **"Add New"** and add each variable:
+     - **Key**: `VITE_SUPABASE_URL`
+     - **Value**: Your Supabase project URL (e.g., `https://xxxxx.supabase.co`)
+     - **Environment**: Select **Production**, **Preview**, and **Development** (or "All Environments")
+     - Click **"Save"**
+   - Repeat for the second variable:
+     - **Key**: `VITE_SUPABASE_PUBLISHABLE_KEY`
+     - **Value**: Your Supabase anon/public key (from Supabase Dashboard → Settings → API)
+     - **Environment**: Select **Production**, **Preview**, and **Development**
+     - Click **"Save"**
+   - **Important**: After adding variables, you must **redeploy** your application for them to take effect
 
 5. **Deploy**
    - Click "Deploy"
@@ -209,10 +214,35 @@ npm run preview
 - Ensure all dependencies are in `package.json`
 - Verify Node.js version matches `.nvmrc` (if present)
 
+### White Screen / Blank Page After Deployment
+**This is usually caused by missing environment variables.**
+
+1. **Check if environment variables are set:**
+   - Go to Vercel Dashboard → Your Project → Settings → Environment Variables
+   - Verify both `VITE_SUPABASE_URL` and `VITE_SUPABASE_PUBLISHABLE_KEY` are present
+   - Ensure they're set for the correct environment (Production/Preview/Development)
+
+2. **Redeploy after adding variables:**
+   - After adding environment variables, trigger a new deployment
+   - Go to Deployments → Click "..." on latest deployment → "Redeploy"
+   - Or push a new commit to trigger automatic deployment
+
+3. **Verify variable values:**
+   - Check browser console (F12) for error messages
+   - The app should now show a configuration error screen if variables are missing
+   - If you see the error screen, double-check your Supabase credentials
+
+4. **Check Supabase credentials:**
+   - Go to Supabase Dashboard → Settings → API
+   - Copy the exact values (no extra spaces or quotes)
+   - Ensure you're using the **anon/public key**, not the service role key
+
 ### Environment Variables Not Working
 - Ensure variables are prefixed with `VITE_` (required for Vite)
 - Restart deployment after adding variables
 - Check variable names match exactly (case-sensitive)
+- **Never include quotes** around the values in Vercel
+- Variables are case-sensitive: `VITE_SUPABASE_URL` not `vite_supabase_url`
 
 ### CORS Errors
 - Add your deployment URL to Supabase allowed origins

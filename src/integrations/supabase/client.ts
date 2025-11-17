@@ -17,22 +17,28 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Validate environment variables
-if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
-  const errorMessage = 
-    '❌ Missing required Supabase environment variables. ' +
-    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY. ' +
-    'See DEPLOYMENT.md or SETUP_INSTRUCTIONS.md for details.';
-  
-  if (import.meta.env.PROD) {
-    // In production, throw an error to prevent runtime issues
-    throw new Error(errorMessage);
-  } else {
-    // In development, log error but allow app to continue
-    // Note: Logger not imported here to avoid circular dependency
-    // This is acceptable as it's only for environment validation
-    console.error(errorMessage);
+/**
+ * Check if Supabase environment variables are configured
+ * @returns true if both variables are set, false otherwise
+ */
+export function isSupabaseConfigured(): boolean {
+  return !!(SUPABASE_URL && SUPABASE_PUBLISHABLE_KEY);
+}
+
+/**
+ * Get error message for missing environment variables
+ */
+export function getSupabaseConfigError(): string | null {
+  if (!SUPABASE_URL && !SUPABASE_PUBLISHABLE_KEY) {
+    return 'Missing VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY environment variables.';
   }
+  if (!SUPABASE_URL) {
+    return 'Missing VITE_SUPABASE_URL environment variable.';
+  }
+  if (!SUPABASE_PUBLISHABLE_KEY) {
+    return 'Missing VITE_SUPABASE_PUBLISHABLE_KEY environment variable.';
+  }
+  return null;
 }
 
 /**
@@ -42,10 +48,13 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
  * - localStorage for session persistence
  * - Auto-refresh token enabled
  * - Typed with Database schema (when types are generated)
+ * 
+ * Note: Client is created even if env vars are missing to prevent module initialization errors.
+ * Use isSupabaseConfigured() to check if client is properly configured before use.
  */
 export const supabase = createClient<Database>(
-  SUPABASE_URL || '',
-  SUPABASE_PUBLISHABLE_KEY || '',
+  SUPABASE_URL || 'https://placeholder.supabase.co',
+  SUPABASE_PUBLISHABLE_KEY || 'placeholder-key',
   {
     auth: {
       storage: localStorage,

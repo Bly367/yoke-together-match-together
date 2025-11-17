@@ -11,6 +11,7 @@ import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { FeatureErrorBoundary } from "@/components/FeatureErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ViewingProvider } from "@/contexts/ViewingContext";
+import { ConfigError } from "@/components/ConfigError";
 import { useDefaultKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useExpireDuoRequests } from "@/hooks/useExpireDuoRequests";
 import { ROUTES } from "@/lib/routes";
@@ -18,6 +19,7 @@ import { Loader2 } from "lucide-react";
 import { initErrorTracking, trackWebVitals } from "@/lib/monitoring";
 import { logger } from "@/lib/logger";
 import { registerSW } from "virtual:pwa-register";
+import { isSupabaseConfigured } from "@/integrations/supabase/client";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -242,6 +244,15 @@ const AppContent = () => {
  * Initializes monitoring and error tracking on mount
  */
 const App = () => {
+  // Check if Supabase is configured - show error screen if not
+  if (!isSupabaseConfigured()) {
+    return (
+      <ErrorBoundary>
+        <ConfigError />
+      </ErrorBoundary>
+    );
+  }
+
   // Initialize error tracking and performance monitoring
   React.useEffect(() => {
     initErrorTracking();
