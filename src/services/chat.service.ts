@@ -225,11 +225,36 @@ export async function sendMessage(
     );
   }
 
+  // Verify user is authenticated and matches sender (pre-check before RLS)
+  // Use auth.uid() directly to ensure we're using the actual authenticated user ID
+  const { data: { user: authUser } } = await supabase.auth.getUser();
+  if (!authUser) {
+    logger.error('User not authenticated', { senderId });
+    throw new Error('You must be authenticated to send messages');
+  }
+  
+  // Use auth.uid() directly instead of senderId to ensure consistency
+  // This prevents issues where profile.id might not match auth.uid()
+  const authenticatedUserId = authUser.id;
+  
+  if (authenticatedUserId !== senderId) {
+    logger.warn('Sender ID mismatch - using authenticated user ID instead', { 
+      authUserId: authenticatedUserId, 
+      senderId,
+      note: 'This may indicate a data inconsistency between profile.id and auth.uid()'
+    });
+    // Use the authenticated user ID instead of the provided senderId
+    // This ensures RLS policies work correctly
+  }
+
+  // Use authenticated user ID to ensure RLS policies work correctly
+  const actualSenderId = authenticatedUserId;
+  
   const { data, error } = await supabase
     .from('messages')
     .insert({
       match_id: matchId,
-      sender_id: senderId,
+      sender_id: actualSenderId, // Use authenticated user ID
       content: sanitizedContent || (attachment ? `📎 ${attachment.name}` : ''),
       attachment_url: attachment?.url,
       attachment_type: attachment?.type,
@@ -242,7 +267,40 @@ export async function sendMessage(
     `)
     .single();
 
-  if (error) throw error;
+  if (error) {
+    logger.error('Failed to insert message', { error, matchId, senderId });
+    // Provide more helpful error message
+    if (error.code === '42501' || error.message?.includes('row-level security')) {
+      throw new Error('Permission denied: You may not be a member of this match or the match may be inactive');
+    }
+    throw error;
+  }
+
+  // Track message_sent preference event (async, don't block)
+  // Use setTimeout to avoid blocking message send
+  setTimeout(async () => {
+    try {
+      const { trackMessageSent } = await import('./preferenceEvents.service');
+      // Find which duo the sender belongs to
+      const { data: senderDuo } = await supabase
+        .from('duos')
+        .select('id')
+        .or(`member1_id.eq.${actualSenderId},member2_id.eq.${actualSenderId}`)
+        .eq('is_active', true)
+        .maybeSingle();
+      
+      if (senderDuo) {
+        // Track message sent event (fire and forget)
+        trackMessageSent(actualSenderId, senderDuo.id).catch((err) => {
+          logger.warn('Failed to track message_sent event', { error: err });
+        });
+      }
+    } catch (err) {
+      // Don't fail message send if tracking fails
+      logger.warn('Failed to track message_sent event', { error: err });
+    }
+  }, 0);
+
   return data as Message;
 }
 
