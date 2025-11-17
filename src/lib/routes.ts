@@ -14,6 +14,7 @@ export const ROUTES = {
   MATCHES: "/matches",
   MESSAGES: "/messages",
   PROFILE: "/profile",
+  PREFERENCES: "/preferences",
   NOTIFICATION_SETTINGS: "/notification-settings",
   NOT_FOUND: "*",
   /**
@@ -41,6 +42,27 @@ export const ROUTES = {
       throw new Error('userId must be a non-empty string');
     }
     return `/join-duo/${userId}`;
+  },
+  /**
+   * Base path for private messages routes
+   */
+  PRIVATE_MESSAGES_BASE: "/private-messages",
+  /**
+   * Private messages list route
+   */
+  PRIVATE_MESSAGES: "/private-messages",
+  /**
+   * Base path for private chat routes
+   */
+  PRIVATE_CHAT_BASE: "/private-chat",
+  /**
+   * Generate private chat route with conversation ID
+   */
+  PRIVATE_CHAT: (conversationId: string) => {
+    if (!conversationId || typeof conversationId !== 'string') {
+      throw new Error('conversationId must be a non-empty string');
+    }
+    return `/private-chat/${conversationId}`;
   },
 } as const;
 

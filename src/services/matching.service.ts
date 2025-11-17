@@ -326,6 +326,89 @@ export async function unmatch(matchId: string): Promise<void> {
     .from('matches')
     .update({ is_active: false })
     .eq('id', matchId);
+  
+  if (error) throw error;
+}
+
+/**
+ * Rename a match/group chat
+ * Note: RLS policies ensure only participants can update matches
+ */
+export async function renameMatch(matchId: string, name: string): Promise<Match> {
+  // Validate name length
+  const trimmedName = name.trim();
+  if (trimmedName.length > 50) {
+    throw new Error('Chat name must be 50 characters or less');
+  }
+
+  const { data, error } = await supabase
+    .from('matches')
+    .update({ name: trimmedName || null })
+    .eq('id', matchId)
+    .select(`
+      *,
+      duo1:duos!matches_duo1_id_fkey(
+        *,
+        member1:profiles!duos_member1_id_fkey(id, name, age, photo_url, gender, preference),
+        member2:profiles!duos_member2_id_fkey(id, name, age, photo_url, gender, preference)
+      ),
+      duo2:duos!matches_duo2_id_fkey(
+        *,
+        member1:profiles!duos_member1_id_fkey(id, name, age, photo_url, gender, preference),
+        member2:profiles!duos_member2_id_fkey(id, name, age, photo_url, gender, preference)
+      )
+    `)
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error('Match not found or you do not have permission to rename it');
+  return data as Match;
+}
+
+/**
+ * Leave a match (mark user as having left)
+ */
+export async function leaveMatch(matchId: string, userId: string): Promise<void> {
+  // Get user's duos to find which duo they're in
+  const { data: userDuos } = await supabase
+    .from('duos')
+    .select('id')
+    .or(`member1_id.eq.${userId},member2_id.eq.${userId}`)
+    .eq('is_active', true);
+
+  if (!userDuos || userDuos.length === 0) {
+    throw new Error('User is not part of any active duo');
+  }
+
+  // Get the match to verify user is a participant
+  const { data: match } = await supabase
+    .from('matches')
+    .select('duo1_id, duo2_id')
+    .eq('id', matchId)
+    .eq('is_active', true)
+    .single();
+
+  if (!match) {
+    throw new Error('Match not found');
+  }
+
+  const userDuoIds = userDuos.map(d => d.id);
+  const isParticipant = userDuoIds.includes(match.duo1_id) || userDuoIds.includes(match.duo2_id);
+
+  if (!isParticipant) {
+    throw new Error('User is not a participant in this match');
+  }
+
+  // Mark user as having left
+  const { error } = await supabase
+    .from('match_participants')
+    .upsert({
+      match_id: matchId,
+      user_id: userId,
+      left_at: new Date().toISOString(),
+    }, {
+      onConflict: 'match_id,user_id',
+    });
 
   if (error) throw error;
 }

@@ -28,7 +28,10 @@ const Matchmaking = lazy(() => import("./pages/Matchmaking"));
 const Matches = lazy(() => import("./pages/Matches"));
 const Messages = lazy(() => import("./pages/Messages"));
 const Chat = lazy(() => import("./pages/Chat"));
+const PrivateMessages = lazy(() => import("./pages/PrivateMessages"));
+const PrivateChat = lazy(() => import("./pages/PrivateChat"));
 const Profile = lazy(() => import("./pages/Profile"));
+const Preferences = lazy(() => import("./pages/Preferences"));
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -126,10 +129,34 @@ const AppContent = () => {
               }
             />
             <Route
+              path={ROUTES.PRIVATE_MESSAGES}
+              element={
+                <ProtectedRoute>
+                  <PrivateMessages />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={`${ROUTES.PRIVATE_CHAT_BASE}/:conversationId`}
+              element={
+                <ProtectedRoute>
+                  <PrivateChat />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path={ROUTES.PROFILE}
               element={
                 <ProtectedRoute>
                   <Profile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={ROUTES.PREFERENCES}
+              element={
+                <ProtectedRoute>
+                  <Preferences />
                 </ProtectedRoute>
               }
             />

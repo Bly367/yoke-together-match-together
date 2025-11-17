@@ -6,18 +6,18 @@ import { ArrowLeft, Send, User, Loader2, Paperclip, X as XIcon, File, Edit2, Log
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { 
-  useAllMessages, 
-  useSendMessage, 
-  useEditMessage,
-  useDeleteMessage,
-  useMarkMessagesAsRead,
-  useMessageSubscription,
-  useTypingIndicator
-} from "@/hooks/useChat";
-import { useMatches, useRenameMatch, useLeaveMatch } from "@/hooks/useMatching";
-import { useUserDuos } from "@/hooks/useDuos";
-import { useCreatePrivateConversation } from "@/hooks/usePrivateMessaging";
-import { getMatchName } from "@/lib/utils";
+  useAllPrivateMessages, 
+  useSendPrivateMessage, 
+  useEditPrivateMessage,
+  useDeletePrivateMessage,
+  useMarkPrivateMessagesAsRead,
+  usePrivateMessageSubscription,
+  usePrivateTypingIndicator,
+  usePrivateConversations,
+  usePrivateConversation,
+  useRenamePrivateConversation,
+  useLeavePrivateConversation
+} from "@/hooks/usePrivateMessaging";
 import {
   Dialog,
   DialogContent,
@@ -40,12 +40,11 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { VirtualizedMessageList } from "@/components/VirtualizedMessageList";
 import { MessageBubble } from "@/components/MessageBubble";
 import { formatDate } from "@/lib/utils";
-import { useViewing } from "@/contexts/ViewingContext";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
-const Chat = () => {
-  const { matchId } = useParams<{ matchId: string }>();
+const PrivateChat = () => {
+  const { conversationId } = useParams<{ conversationId: string }>();
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
   const [editingMessageId, setEditingMessageId] = useState<string | null>(null);
@@ -55,143 +54,88 @@ const Chat = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messageInputRef = useRef<HTMLInputElement>(null);
   const { user } = useAuth();
-  const { setCurrentChatId } = useViewing();
 
-  // Track current chat for notification purposes
-  useEffect(() => {
-    if (matchId) {
-      setCurrentChatId(matchId);
-    }
-    return () => {
-      setCurrentChatId(null);
-    };
-  }, [matchId, setCurrentChatId]);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const messagesScrollRef = useRef<HTMLDivElement>(null);
   const [containerHeight, setContainerHeight] = useState(600);
   const previousMessagesLengthRef = useRef<number>(0);
-  const previousMatchIdRef = useRef<string | undefined>(undefined);
+  const previousConversationIdRef = useRef<string | undefined>(undefined);
   const isUserScrollingRef = useRef<boolean>(false);
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const shouldAutoScrollRef = useRef<boolean>(true);
 
-  const { data: messages = [], isLoading: messagesLoading, isError: messagesError, error: messagesErrorDetails } = useAllMessages(matchId || null);
-  const sendMessageMutation = useSendMessage();
-  const editMessageMutation = useEditMessage();
-  const deleteMessageMutation = useDeleteMessage();
-  const markAsReadMutation = useMarkMessagesAsRead();
+  const { data: messages = [], isLoading: messagesLoading, isError: messagesError } = 
+    useAllPrivateMessages(conversationId || null);
+  const sendMessageMutation = useSendPrivateMessage();
+  const editMessageMutation = useEditPrivateMessage();
+  const deleteMessageMutation = useDeletePrivateMessage();
+  const markAsReadMutation = useMarkPrivateMessagesAsRead();
   const uploadAttachmentMutation = useUploadMessageAttachment();
-  const createPrivateConversationMutation = useCreatePrivateConversation();
-  const renameMatchMutation = useRenameMatch();
-  const leaveMatchMutation = useLeaveMatch();
-  const { data: matches, isLoading: matchesLoading, isError: matchesError } = useMatches();
-  const { data: userDuos, isLoading: userDuosLoading, isError: userDuosError } = useUserDuos();
+  const renameConversationMutation = useRenamePrivateConversation();
+  const leaveConversationMutation = useLeavePrivateConversation();
+  const { data: conversations, isLoading: conversationsLoading } = usePrivateConversations(user?.id || null);
+  const { data: conversationFromQuery, isLoading: conversationLoading } = usePrivateConversation(
+    conversationId || null,
+    user?.id || null
+  );
   
   // Rename dialog state
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
 
-  // Subscribe to new messages
-  useMessageSubscription(matchId || null, true);
+  // Subscribe to new messages - only when conversationId exists
+  usePrivateMessageSubscription(conversationId || null, !!conversationId);
 
-  // Typing indicators
-  const { typingUsers, handleTyping } = useTypingIndicator(
-    matchId || null,
+  // Typing indicators - only when conversationId and user exist
+  const { typingUsers, handleTyping } = usePrivateTypingIndicator(
+    conversationId || null,
     user?.id || null,
     user?.name || null
   );
 
   // Mark messages as read when viewing the chat
   useEffect(() => {
-    if (matchId && user?.id && messages.length > 0) {
+    if (conversationId && user?.id && messages.length > 0) {
       // Mark all messages as read when viewing
       markAsReadMutation.mutate({
-        matchId,
+        conversationId,
         userId: user.id,
       });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchId, user?.id, messages.length]);
+  }, [conversationId, user?.id, messages.length]);
 
-  // Find the match - memoized for performance
-  const match = useMemo(() => {
-    return matches?.find(m => m.id === matchId);
-  }, [matches, matchId]);
+  // Find the conversation - memoized for performance
+  // Prefer direct query result, fallback to conversations list
+  const conversation = useMemo(() => {
+    if (conversationFromQuery) return conversationFromQuery;
+    return conversations?.find(c => c.id === conversationId);
+  }, [conversationFromQuery, conversations, conversationId]);
 
-  // Memoize user duo IDs for O(1) lookup
-  const userDuoIdsSet = useMemo(() => {
-    if (!userDuos || userDuos.length === 0) return new Set<string>();
-    return new Set(userDuos.map(d => d.id));
-  }, [userDuos]);
+  // Get other user info - memoized for performance
+  const otherUser = useMemo(() => {
+    if (!conversation || !user?.id) return null;
+    
+    return conversation.user1_id === user.id 
+      ? conversation.user2 
+      : conversation.user1;
+  }, [conversation, user?.id]);
 
-  // Get other duo info - memoized for performance
-  const otherDuo = useMemo(() => {
-    if (!match || !match.duo1 || !match.duo2 || userDuoIdsSet.size === 0) return null;
-    
-    // Find which duo is the user's duo using Set for O(1) lookup
-    const isDuo1UserDuo = userDuoIdsSet.has(match.duo1_id);
-    const isDuo2UserDuo = userDuoIdsSet.has(match.duo2_id);
-    
-    // Return the duo that's NOT the user's duo
-    if (isDuo1UserDuo) return match.duo2;
-    if (isDuo2UserDuo) return match.duo1;
-    
-    // Fallback to duo2 if we can't determine
-    return match.duo2;
-  }, [match, userDuoIdsSet]);
-
-  // Get all participants (all 4 users) - memoized for performance
-  const allParticipants = useMemo(() => {
-    if (!match || !match.duo1 || !match.duo2 || !user?.id) return [];
-    
-    const participants = [
-      match.duo1.member1,
-      match.duo1.member2,
-      match.duo2.member1,
-      match.duo2.member2,
-    ].filter((member): member is NonNullable<typeof member> => 
-      member !== null && member !== undefined && member.id !== user.id
-    );
-    
-    return participants;
-  }, [match, user?.id]);
-
-  // Get match display name (custom name or default)
-  const matchDisplayName = useMemo(() => {
-    if (!match) return 'Group Chat';
-    if (match.name) return match.name;
-    if (!userDuoIdsSet.size) return 'Group Chat';
-    return getMatchName(match, userDuoIdsSet);
-  }, [match, userDuoIdsSet]);
-
-  // Handle clicking on a participant to start private message
-  const handleParticipantClick = async (participantId: string) => {
-    if (!user?.id || participantId === user.id) return;
-    
-    try {
-      const conversation = await createPrivateConversationMutation.mutateAsync({
-        user1Id: user.id,
-        user2Id: participantId,
-      });
-      
-      navigate(ROUTES.PRIVATE_CHAT(conversation.id));
-    } catch (error) {
-      console.error('Error creating private conversation:', error);
-      toast.error(
-        error instanceof Error 
-          ? error.message 
-          : 'Failed to start private conversation. Make sure you have matched with this user.'
-      );
-    }
-  };
+  // Get conversation display name (custom name or other user name)
+  const conversationDisplayName = useMemo(() => {
+    if (!conversation) return 'Private Chat';
+    if (conversation.name) return conversation.name;
+    if (!otherUser) return 'Private Chat';
+    return otherUser.name || 'Private Chat';
+  }, [conversation, otherUser]);
 
   // Handle rename
   const handleRename = async () => {
-    if (!matchId) return;
+    if (!conversationId) return;
     
     try {
-      await renameMatchMutation.mutateAsync({
-        matchId,
+      await renameConversationMutation.mutateAsync({
+        conversationId,
         name: renameValue.trim(),
       });
       setIsRenameDialogOpen(false);
@@ -209,28 +153,28 @@ const Chat = () => {
 
   // Handle leave
   const handleLeave = async () => {
-    if (!matchId || !user?.id) return;
+    if (!conversationId || !user?.id) return;
     
-    if (!confirm('Are you sure you want to leave this group chat? You can rejoin later.')) {
+    if (!confirm('Are you sure you want to leave this conversation? You can rejoin later.')) {
       return;
     }
     
     try {
-      await leaveMatchMutation.mutateAsync(matchId);
-      toast.success('Left group chat');
+      await leaveConversationMutation.mutateAsync(conversationId);
+      toast.success('Left conversation');
     } catch (error) {
-      console.error('Error leaving chat:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to leave chat');
+      console.error('Error leaving conversation:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to leave conversation');
     }
   };
 
   // Open rename dialog
   const handleOpenRenameDialog = () => {
-    setRenameValue(matchDisplayName);
+    setRenameValue(conversationDisplayName);
     setIsRenameDialogOpen(true);
   };
 
-  // Update container height on resize and when messages container is available
+  // Update container height on resize
   useEffect(() => {
     const updateHeight = () => {
       if (messagesContainerRef.current) {
@@ -241,13 +185,9 @@ const Chat = () => {
       }
     };
     
-    // Initial update
     updateHeight();
-    
-    // Update on resize
     window.addEventListener('resize', updateHeight);
     
-    // Also update when container becomes available
     const observer = new ResizeObserver(updateHeight);
     if (messagesContainerRef.current) {
       observer.observe(messagesContainerRef.current);
@@ -259,10 +199,10 @@ const Chat = () => {
     };
   }, []);
 
-  // Handle scroll detection - track if user is manually scrolling
+  // Handle scroll detection
   useEffect(() => {
     const scrollContainer = messagesScrollRef.current;
-    if (!scrollContainer || messages.length > 50) return; // Only for non-virtualized list
+    if (!scrollContainer || messages.length > 50) return;
 
     const handleScroll = () => {
       if (scrollTimeoutRef.current) {
@@ -272,7 +212,6 @@ const Chat = () => {
       isUserScrollingRef.current = true;
       shouldAutoScrollRef.current = false;
 
-      // Check if user scrolled to bottom (within 100px)
       const isNearBottom = 
         scrollContainer.scrollHeight - scrollContainer.scrollTop - scrollContainer.clientHeight < 100;
       
@@ -280,7 +219,6 @@ const Chat = () => {
         shouldAutoScrollRef.current = true;
       }
 
-      // Reset scrolling flag after 1 second of no scrolling
       scrollTimeoutRef.current = setTimeout(() => {
         isUserScrollingRef.current = false;
       }, 1000);
@@ -295,279 +233,202 @@ const Chat = () => {
     };
   }, [messages.length]);
 
-  // Smooth auto-scroll to bottom when:
-  // 1. Chat is first opened (matchId changes) - always scroll to latest message
-  // 2. New messages arrive (especially when sent by current user)
+  // Auto-scroll to bottom
   useEffect(() => {
-    // Only scroll for non-virtualized list (messages.length <= 50)
     if (messages.length > 50) return;
 
     const scrollContainer = messagesScrollRef.current;
     if (!scrollContainer || messages.length === 0) return;
 
-    const isFirstLoad = previousMatchIdRef.current !== matchId;
+    const isFirstLoad = previousConversationIdRef.current !== conversationId;
     const hasNewMessages = messages.length > previousMessagesLengthRef.current;
     const lastMessage = messages[messages.length - 1];
     const isOwnMessage = lastMessage && lastMessage.sender_id === user?.id;
 
-    // Always scroll on first load (entering chat)
-    // Also scroll when new messages arrive if:
-    // - User sent the message, OR
-    // - User is already at bottom (shouldAutoScrollRef)
     if (isFirstLoad || (hasNewMessages && (isOwnMessage || shouldAutoScrollRef.current))) {
-      // Use multiple requestAnimationFrame calls to ensure DOM is fully updated and container has height
-      const scrollToBottom = () => {
-        if (scrollContainer) {
-          const maxScroll = scrollContainer.scrollHeight - scrollContainer.clientHeight;
-          if (maxScroll > 0) {
-            scrollContainer.scrollTop = scrollContainer.scrollHeight;
-          }
-        }
-      };
-      
-      // Try multiple times to ensure it works even if container height isn't ready yet
-      requestAnimationFrame(() => {
-        scrollToBottom();
-        requestAnimationFrame(() => {
-          scrollToBottom();
-          setTimeout(scrollToBottom, 100);
+      setTimeout(() => {
+        scrollContainer.scrollTo({
+          top: scrollContainer.scrollHeight,
+          behavior: isFirstLoad ? 'auto' : 'smooth',
         });
-      });
+        shouldAutoScrollRef.current = true;
+      }, 100);
     }
 
     previousMessagesLengthRef.current = messages.length;
-    previousMatchIdRef.current = matchId;
-  }, [messages, matchId, user?.id]);
+    previousConversationIdRef.current = conversationId;
+  }, [messages, conversationId, user?.id]);
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    // Validate file size (10MB)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024;
-    if (file.size > MAX_FILE_SIZE) {
-      toast.error('File size must be less than 10MB');
-      return;
-    }
-
-    setAttachment(file);
-
-    // Create preview for images
-    if (file.type.startsWith('image/')) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setAttachmentPreview(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+  // Handle typing indicator
+  useEffect(() => {
+    if (message.trim()) {
+      handleTyping(true);
     } else {
-      setAttachmentPreview(null);
+      handleTyping(false);
     }
-  };
-
-  const handleRemoveAttachment = () => {
-    setAttachment(null);
-    setAttachmentPreview(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
-  };
+  }, [message, handleTyping]);
 
   const handleSend = async () => {
-    if ((!message.trim() && !attachment) || !matchId || !user) return;
+    if (!conversationId || !user?.id || !otherUser?.id) return;
     
-    if (message.length > MAX_MESSAGE_LENGTH) {
-      toast.error(`Message must be less than ${MAX_MESSAGE_LENGTH} characters`);
+    const trimmedMessage = message.trim();
+    if (!trimmedMessage && !attachment) return;
+
+    if (trimmedMessage.length > MAX_MESSAGE_LENGTH) {
+      toast.error(`Message must be ${MAX_MESSAGE_LENGTH} characters or less`);
       return;
     }
 
     try {
-      let attachmentData = undefined;
+      let attachmentUrl: string | undefined;
+      let attachmentType: string | undefined;
+      let attachmentName: string | undefined;
+      let attachmentSize: number | undefined;
 
-      // Upload attachment if present
       if (attachment) {
-        const uploaded = await uploadAttachmentMutation.mutateAsync({
+        const uploadResult = await uploadAttachmentMutation.mutateAsync({
           file: attachment,
-          userId: user.id,
-          matchId,
+          folder: 'private-message-attachments',
         });
-        attachmentData = {
-          url: uploaded.url,
-          type: uploaded.type,
-          name: uploaded.name,
-          size: uploaded.size,
-        };
+        attachmentUrl = uploadResult.url;
+        attachmentType = attachment.type;
+        attachmentName = attachment.name;
+        attachmentSize = attachment.size;
       }
 
       await sendMessageMutation.mutateAsync({
-        matchId,
+        conversationId,
         senderId: user.id,
-        content: message.trim() || (attachment ? `📎 ${attachment.name}` : ''),
-        attachment: attachmentData,
+        recipientId: otherUser.id,
+        content: trimmedMessage || '',
+        attachment: attachmentUrl
+          ? {
+              url: attachmentUrl,
+              type: attachmentType || '',
+              name: attachmentName || '',
+              size: attachmentSize || 0,
+            }
+          : undefined,
       });
-      
+
       setMessage("");
       setAttachment(null);
       setAttachmentPreview(null);
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
-      
-      // Refocus the message input after sending
-      // Use setTimeout to ensure the DOM has updated
-      setTimeout(() => {
-        messageInputRef.current?.focus();
-      }, 0);
-      
-      // Scroll to bottom after sending message
-      // The useEffect hooks will handle scrolling automatically when messages update
-      // For non-virtualized list, scroll immediately as a fallback
-      if (messages.length <= 50) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            if (messagesScrollRef.current) {
-              messagesScrollRef.current.scrollTop = messagesScrollRef.current.scrollHeight;
-            }
-          });
-        });
-      }
-    } catch (error: any) {
-      console.error('Failed to send message:', error);
-      toast.error(error.message || 'Failed to send message');
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to send message');
     }
   };
 
-  const handleEdit = async (messageId: string) => {
-    if (!editContent.trim() || !user) return;
-    
-    if (editContent.length > MAX_MESSAGE_LENGTH) {
-      toast.error(`Message must be less than ${MAX_MESSAGE_LENGTH} characters`);
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
       return;
     }
 
+    setAttachment(file);
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setAttachmentPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleStartEdit = (messageId: string, content: string) => {
+    setEditingMessageId(messageId);
+    setEditContent(content);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessageId || !user?.id) return;
+
     try {
       await editMessageMutation.mutateAsync({
-        messageId,
+        messageId: editingMessageId,
         senderId: user.id,
-        newContent: editContent.trim(),
+        newContent: editContent,
       });
       setEditingMessageId(null);
       setEditContent("");
-    } catch (error: any) {
-      console.error('Failed to edit message:', error);
-      toast.error(error.message || 'Failed to edit message');
+    } catch (error) {
+      console.error('Error editing message:', error);
+      toast.error('Failed to edit message');
     }
+  };
+
+  const handleCancelEdit = () => {
+    setEditingMessageId(null);
+    setEditContent("");
   };
 
   const handleDelete = async (messageId: string) => {
-    if (!user) return;
+    if (!user?.id) return;
 
-    if (window.confirm('Are you sure you want to delete this message?')) {
-      try {
-        await deleteMessageMutation.mutateAsync({
-          messageId,
-          senderId: user.id,
-        });
-      } catch (error: any) {
-        console.error('Failed to delete message:', error);
-      }
+    if (!confirm('Are you sure you want to delete this message?')) return;
+
+    try {
+      await deleteMessageMutation.mutateAsync({
+        messageId,
+        senderId: user.id,
+      });
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      toast.error('Failed to delete message');
     }
   };
 
-  const startEditing = (msg: any) => {
-    setEditingMessageId(msg.id);
-    setEditContent(msg.content);
-  };
-
-
-  // Show loading state while essential data is loading
-  if (messagesLoading || matchesLoading || userDuosLoading) {
+  if (messagesLoading || conversationsLoading || conversationLoading) {
     return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-muted-foreground mt-4">Loading chat...</p>
       </div>
     );
   }
 
-  // Show error state if queries failed
-  if (messagesError || matchesError || userDuosError) {
-    // Extract error message properly
-    const getErrorMessage = (error: unknown): string => {
-      if (!error) return 'Unknown error';
-      if (error instanceof Error) return error.message;
-      if (typeof error === 'object' && 'message' in error) {
-        return String(error.message);
-      }
-      if (typeof error === 'object' && 'code' in error) {
-        return `Error code: ${error.code}`;
-      }
-      return String(error);
-    };
-
+  if (!conversationId) {
     return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center space-y-4 px-4">
-        <p className="text-destructive text-lg font-semibold">Failed to load chat</p>
-        <div className="text-sm text-muted-foreground max-w-md text-center space-y-2">
-          {messagesError && (
-            <p>
-              <strong>Messages error:</strong> {getErrorMessage(messagesErrorDetails)}
-            </p>
-          )}
-          {matchesError && (
-            <p>
-              <strong>Matches error:</strong> {getErrorMessage(matchesError)}
-            </p>
-          )}
-          {userDuosError && (
-            <p>
-              <strong>Duos error:</strong> {getErrorMessage(userDuosError)}
-            </p>
-          )}
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => navigate(ROUTES.MESSAGES)}>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-destructive mb-2">No conversation ID provided</p>
+          <Button onClick={() => navigate(ROUTES.PRIVATE_MESSAGES)}>
             Back to Messages
           </Button>
-          <Button variant="outline" onClick={() => window.location.reload()}>
-            Retry
+        </div>
+      </div>
+    );
+  }
+
+  if (messagesError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-destructive mb-2">Error loading messages</p>
+          <Button onClick={() => navigate(ROUTES.PRIVATE_MESSAGES)}>
+            Back to Messages
           </Button>
         </div>
       </div>
     );
   }
 
-  // Check if match exists after data is loaded
-  if (!matchId) {
+  if (!conversation || !otherUser) {
     return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center space-y-4">
-        <p className="text-muted-foreground">No match ID provided</p>
-        <Button variant="outline" onClick={() => navigate(ROUTES.MESSAGES)}>
-          Back to Messages
-        </Button>
-      </div>
-    );
-  }
-
-  if (!match) {
-    return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center space-y-4">
-        <p className="text-muted-foreground">Match not found</p>
-        <p className="text-sm text-muted-foreground">Match ID: {matchId}</p>
-        <Button variant="outline" onClick={() => navigate(ROUTES.MESSAGES)}>
-          Back to Messages
-        </Button>
-      </div>
-    );
-  }
-
-  if (!otherDuo) {
-    return (
-      <div className="flex flex-col h-screen bg-gradient-to-br from-background via-secondary/20 to-background flex items-center justify-center space-y-4">
-        <p className="text-muted-foreground">Unable to load match details</p>
-        <p className="text-sm text-muted-foreground">This might happen if you're not part of this match.</p>
-        <Button variant="outline" onClick={() => navigate(ROUTES.MESSAGES)}>
-          Back to Messages
-        </Button>
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="text-center">
+          <p className="text-muted-foreground mb-2">Loading conversation...</p>
+          <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-4" />
+          <Button onClick={() => navigate(ROUTES.PRIVATE_MESSAGES)}>
+            Back to Messages
+          </Button>
+        </div>
       </div>
     );
   }
@@ -578,7 +439,7 @@ const Chat = () => {
       <div className="bg-card shadow-sm border-b border-border flex-shrink-0">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(ROUTES.MESSAGES)}>
+            <Button variant="ghost" size="icon" onClick={() => navigate(ROUTES.PRIVATE_MESSAGES)}>
               <ArrowLeft className="w-6 h-6" />
             </Button>
             
@@ -586,7 +447,7 @@ const Chat = () => {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <h2 className="font-semibold text-foreground truncate">
-                    {matchDisplayName}
+                    {conversationDisplayName}
                   </h2>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
@@ -619,38 +480,24 @@ const Chat = () => {
                 </p>
               </div>
 
-              {/* Participants - to the right */}
-              <div className="flex items-center gap-2 flex-shrink-0">
-                {allParticipants.map((participant) => (
-                  <button
-                    key={participant.id}
-                    onClick={() => handleParticipantClick(participant.id)}
-                    disabled={createPrivateConversationMutation.isPending}
-                    className={cn(
-                      "flex items-center gap-1.5 px-2 py-1 rounded-lg transition-colors",
-                      "hover:bg-primary/10 hover:text-primary",
-                      "disabled:opacity-50 disabled:cursor-not-allowed",
-                      "group"
+              {/* Other user avatar - to the right */}
+              {otherUser && (
+                <div className="flex-shrink-0">
+                  <div className={cn(
+                    "w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0"
+                  )}>
+                    {otherUser.photo_url ? (
+                      <img
+                        src={otherUser.photo_url}
+                        alt={otherUser.name}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <User className="w-5 h-5 text-primary" />
                     )}
-                    title={`Click to message ${participant.name} privately`}
-                  >
-                    <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center overflow-hidden flex-shrink-0 ring-2 ring-transparent group-hover:ring-primary/30 transition-all">
-                      {participant.photo_url ? (
-                        <img
-                          src={participant.photo_url}
-                          alt={participant.name}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <User className="w-4 h-4 text-primary" />
-                      )}
-                    </div>
-                    <span className="text-xs font-medium text-foreground group-hover:text-primary transition-colors hidden sm:inline">
-                      {participant.name}
-                    </span>
-                  </button>
-                ))}
-              </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -660,9 +507,9 @@ const Chat = () => {
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Rename Group Chat</DialogTitle>
+            <DialogTitle>Rename Private Chat</DialogTitle>
             <DialogDescription>
-              Give this group chat a custom name. Leave empty to use default names.
+              Give this private chat a custom name. Leave empty to use the other user's name.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -691,9 +538,9 @@ const Chat = () => {
             </Button>
             <Button
               onClick={handleRename}
-              disabled={renameMatchMutation.isPending}
+              disabled={renameConversationMutation.isPending}
             >
-              {renameMatchMutation.isPending ? (
+              {renameConversationMutation.isPending ? (
                 <>
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                   Saving...
@@ -713,19 +560,18 @@ const Chat = () => {
       >
         {messages.length > 50 ? (
           <VirtualizedMessageList
-            messages={messages}
+            messages={messages.map(msg => ({
+              ...msg,
+              match_id: msg.conversation_id, // MessageBubble expects match_id
+            }))}
             currentUserId={user?.id || null}
             editingMessageId={editingMessageId}
             editContent={editContent}
             onEditChange={setEditContent}
-            onStartEdit={startEditing}
-            onSaveEdit={handleEdit}
-            onCancelEdit={() => {
-              setEditingMessageId(null);
-              setEditContent("");
-            }}
+            onStartEdit={handleStartEdit}
+            onSaveEdit={handleSaveEdit}
+            onCancelEdit={handleCancelEdit}
             onDelete={handleDelete}
-            isEditingPending={editMessageMutation.isPending}
             containerHeight={containerHeight}
           />
         ) : (
@@ -755,17 +601,17 @@ const Chat = () => {
                 return (
                   <MessageBubble
                     key={msg.id}
-                    message={msg}
+                    message={{
+                      ...msg,
+                      match_id: msg.conversation_id, // MessageBubble expects match_id
+                    }}
                     isOwn={isOwn}
                     isEditing={isEditing}
                     editContent={editContent}
                     onEditChange={setEditContent}
-                    onStartEdit={() => startEditing(msg)}
-                    onSaveEdit={() => handleEdit(msg.id)}
-                    onCancelEdit={() => {
-                      setEditingMessageId(null);
-                      setEditContent("");
-                    }}
+                    onStartEdit={() => handleStartEdit(msg.id, msg.content)}
+                    onSaveEdit={handleSaveEdit}
+                    onCancelEdit={handleCancelEdit}
                     onDelete={() => handleDelete(msg.id)}
                     isEditingPending={editMessageMutation.isPending}
                     showAvatar={!isOwn}
@@ -784,7 +630,7 @@ const Chat = () => {
         )}
       </div>
 
-      {/* Input */}
+      {/* Message Input */}
       <div className="bg-card border-t border-border p-4 flex-shrink-0">
         <div className="max-w-4xl mx-auto space-y-2">
           {/* Attachment Preview */}
@@ -810,7 +656,13 @@ const Chat = () => {
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8"
-                onClick={handleRemoveAttachment}
+                onClick={() => {
+                  setAttachment(null);
+                  setAttachmentPreview(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                }}
               >
                 <XIcon className="w-4 h-4" />
               </Button>
@@ -894,4 +746,5 @@ const Chat = () => {
   );
 };
 
-export default Chat;
+export default PrivateChat;
+

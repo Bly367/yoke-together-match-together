@@ -1,11 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ROUTES } from '@/lib/routes';
 import {
   swipeOnDuo,
   getUserMatches,
   getSwipedDuoIds,
   checkMatch,
   unmatch,
+  renameMatch,
+  leaveMatch,
   undoSwipe,
   subscribeToMatches,
   type SwipeAction,
@@ -187,6 +191,45 @@ export function useUnmatch() {
     onSuccess: () => {
       // Invalidate matches query to refresh the list
       queryClient.invalidateQueries({ queryKey: ['matches', user?.id] });
+    },
+  });
+}
+
+/**
+ * Hook to rename a match/group chat
+ */
+export function useRenameMatch() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+
+  return useMutation({
+    mutationFn: ({ matchId, name }: { matchId: string; name: string }) =>
+      renameMatch(matchId, name),
+    onSuccess: () => {
+      // Invalidate matches query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['matches', user?.id] });
+    },
+  });
+}
+
+/**
+ * Hook to leave a match
+ */
+export function useLeaveMatch() {
+  const queryClient = useQueryClient();
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  return useMutation({
+    mutationFn: (matchId: string) => {
+      if (!user?.id) throw new Error('User not authenticated');
+      return leaveMatch(matchId, user.id);
+    },
+    onSuccess: () => {
+      // Invalidate matches query to refresh the list
+      queryClient.invalidateQueries({ queryKey: ['matches', user?.id] });
+      // Navigate back to messages
+      navigate(ROUTES.MESSAGES);
     },
   });
 }

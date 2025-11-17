@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Settings, LogOut, Loader2, User, Users, Mail, Bell } from "lucide-react";
+import { ArrowLeft, Settings, LogOut, Loader2, User, Users, Mail, Bell, Sliders } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserDuos, useActiveDuo, useSetActiveDuo, useDeleteDuo } from "@/hooks/useDuos";
@@ -328,6 +328,15 @@ const Profile = () => {
           >
             <Settings className="w-5 h-5 mr-2" />
             Edit Profile
+          </Button>
+          <Button 
+            variant="outline" 
+            className="w-full justify-start" 
+            size="lg"
+            onClick={() => navigate(ROUTES.PREFERENCES)}
+          >
+            <Sliders className="w-5 h-5 mr-2" />
+            Edit Preferences
           </Button>
           <Button 
             variant="outline" 

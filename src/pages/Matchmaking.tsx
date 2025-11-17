@@ -23,7 +23,8 @@ import {
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import { canDuosMatch } from "@/lib/preferences";
+import { canDuosMatch, duoMatchesPreferences } from "@/lib/preferences";
+import { useUserPreferences, useUserInterests } from "@/hooks/usePreferences";
 
 interface SwipeState {
   x: number;
@@ -65,6 +66,10 @@ const Matchmaking = () => {
   const { data: userDuos, isLoading: duosLoading, isError: duosError, error: duosErrorDetails } = useUserDuos();
   const userDuo = useActiveDuo();
 
+  // Get user preferences and interests for advanced filtering
+  const { data: userPreferences } = useUserPreferences(user?.id);
+  const { data: userInterests = [] } = useUserInterests(user?.id);
+
   // Get matches for badge count
   const { data: matches } = useMatches();
   const matchesCount = matches?.length || 0;
@@ -78,28 +83,40 @@ const Matchmaking = () => {
     swipedIds
   );
 
-  // Filter duos by age, interests, location, and preferences
+  // Filter duos using advanced preferences system
   const availableDuos = useMemo(() => {
     if (!activeDuos || !userDuo) return [];
     
+    // Get user location coordinates if available
+    const userCoords = userLocation || (user?.location ? extractCoordinatesFromPoint(user.location) : undefined);
+    
     return activeDuos.filter((duo) => {
-      // Preference filter - check if duos can match based on preferences
+      // Basic preference filter - check if duos can match based on gender preferences
       // This ensures both duos are interested in each other
       if (!canDuosMatch(userDuo, duo)) {
         return false;
       }
       
-      // Age filter - check both members
-      const member1Age = duo.member1?.age || 0;
-      const member2Age = duo.member2?.age || 0;
-      const minAge = Math.min(member1Age, member2Age);
-      const maxAge = Math.max(member1Age, member2Age);
-      
-      if (minAge < filters.minAge || maxAge > filters.maxAge) {
+      // Advanced preferences filter (dealbreakers are hard filters)
+      const matchResult = duoMatchesPreferences(duo, userPreferences || null, userCoords);
+      if (!matchResult.matches) {
         return false;
       }
       
-      // Interests filter
+      // Legacy filter support (for backward compatibility with quick filters)
+      // Age filter - check both members
+      if (filters.minAge > 18 || filters.maxAge < 100) {
+        const member1Age = duo.member1?.age || 0;
+        const member2Age = duo.member2?.age || 0;
+        const minAge = Math.min(member1Age, member2Age);
+        const maxAge = Math.max(member1Age, member2Age);
+        
+        if (minAge < filters.minAge || maxAge > filters.maxAge) {
+          return false;
+        }
+      }
+      
+      // Interests filter (legacy quick filter)
       if (filters.interests.length > 0 && duo.interests) {
         const hasMatchingInterest = filters.interests.some(interest =>
           duo.interests?.some(duoInterest =>
@@ -109,12 +126,8 @@ const Matchmaking = () => {
         if (!hasMatchingInterest) return false;
       }
       
-      // Location filter (if location data is available)
-      if (filters.maxDistance < 50 && userLocation && user?.location) {
-        // Extract user's location coordinates
-        const userCoords = extractCoordinatesFromPoint(user.location);
-        if (!userCoords) return true; // Skip location filter if can't parse user location
-        
+      // Location filter (legacy quick filter - only if preferences don't handle it)
+      if (!userPreferences?.max_distance_miles && filters.maxDistance < 50 && userCoords) {
         // Check if either member has location data
         const member1Coords = duo.member1?.location 
           ? extractCoordinatesFromPoint(duo.member1.location)
@@ -153,7 +166,7 @@ const Matchmaking = () => {
       
       return true;
     });
-  }, [activeDuos, filters, userDuo, userLocation, user]);
+  }, [activeDuos, filters, userDuo, userPreferences, userLocation, user]);
 
   const currentDuo = availableDuos[currentIndex];
   const swipeMutation = useSwipe();
@@ -451,7 +464,8 @@ const Matchmaking = () => {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label>Age Range: {filters.minAge} - {filters.maxAge}</Label>
+                    <Label>Quick Age Range: {filters.minAge} - {filters.maxAge}</Label>
+                    <p className="text-xs text-muted-foreground">Override preferences age range</p>
                     <div className="flex gap-2">
                       <Input
                         type="number"
@@ -473,7 +487,8 @@ const Matchmaking = () => {
                   </div>
 
                   <div className="space-y-2">
-                    <Label>Interests (comma-separated)</Label>
+                    <Label>Quick Interests Filter (comma-separated)</Label>
+                    <p className="text-xs text-muted-foreground">Override preferences interests</p>
                     <Input
                       placeholder="hiking, coffee, music"
                       value={filters.interests.join(', ')}
@@ -485,6 +500,17 @@ const Matchmaking = () => {
                         setFilters(prev => ({ ...prev, interests }));
                       }}
                     />
+                  </div>
+
+                  <div className="pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="w-full"
+                      onClick={() => navigate(ROUTES.PREFERENCES)}
+                    >
+                      Manage Advanced Preferences
+                    </Button>
                   </div>
                 </div>
               </PopoverContent>
