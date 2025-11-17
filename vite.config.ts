@@ -67,19 +67,19 @@ export default defineConfig(({ mode }) => ({
         manualChunks: (id) => {
           // Vendor chunks for better caching
           if (id.includes('node_modules')) {
-            // React and React DOM
+            // React and React DOM - MUST be in same chunk and load first
             if (id.includes('react') || id.includes('react-dom')) {
               return 'react-vendor';
             }
-            // React Router
+            // React Router - depends on React, so keep separate but ensure React loads first
             if (id.includes('react-router')) {
               return 'router-vendor';
             }
-            // React Query
+            // React Query - depends on React
             if (id.includes('@tanstack/react-query')) {
               return 'query-vendor';
             }
-            // Radix UI components (large library)
+            // Radix UI components (large library) - depends on React
             if (id.includes('@radix-ui')) {
               return 'ui-vendor';
             }
@@ -97,5 +97,10 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000,
     // Source maps for production debugging (can be disabled for smaller builds)
     sourcemap: mode === "development",
+    // Ensure proper module resolution
+    commonjsOptions: {
+      include: [/node_modules/],
+      transformMixedEsModules: true,
+    },
   },
 }));
