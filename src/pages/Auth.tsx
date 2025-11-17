@@ -93,7 +93,10 @@ const Auth = () => {
         navigate(ROUTES.PROFILE_SETUP);
       }
     } catch (error: any) {
-      toast.error(error.message || "An error occurred");
+      // Extract user-friendly error message
+      const errorMessage = error?.message || error?.error?.message || "An error occurred. Please try again.";
+      toast.error(errorMessage);
+      console.error('Auth error:', error);
     }
   };
 

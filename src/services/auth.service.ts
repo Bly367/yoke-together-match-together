@@ -241,7 +241,23 @@ export async function signIn(email: string, password: string): Promise<UserProfi
     password,
   });
 
-  if (error) throw error;
+  if (error) {
+    // Provide user-friendly error messages for common auth errors
+    if (error.message?.includes('Invalid login credentials') || 
+        error.message?.includes('Email not confirmed') ||
+        error.status === 400) {
+      throw new Error('Invalid email or password. Please check your credentials and try again.');
+    }
+    if (error.message?.includes('Email rate limit exceeded')) {
+      throw new Error('Too many sign-in attempts. Please wait a few minutes and try again.');
+    }
+    if (error.message?.includes('User not found')) {
+      throw new Error('No account found with this email address.');
+    }
+    // For other errors, use the error message if available, otherwise provide a generic message
+    throw new Error(error.message || 'Sign in failed. Please try again.');
+  }
+  
   if (!data.user) throw new Error('Failed to sign in');
 
   // Get profile
