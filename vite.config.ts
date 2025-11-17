@@ -68,10 +68,12 @@ export default defineConfig(({ mode }) => ({
           // Vendor chunks for better caching
           if (id.includes('node_modules')) {
             // React and React DOM - MUST be in same chunk and load first
+            // Keep React in main bundle to ensure it loads before everything else
             if (id.includes('react') || id.includes('react-dom')) {
-              return 'react-vendor';
+              // Don't split React - keep it in main bundle for reliability
+              return undefined;
             }
-            // React Router - depends on React, so keep separate but ensure React loads first
+            // React Router - depends on React
             if (id.includes('react-router')) {
               return 'router-vendor';
             }
