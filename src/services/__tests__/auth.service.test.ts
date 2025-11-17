@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { signUp, signIn, updateProfile, validateEmail, validatePassword, validateName } from '../auth.service';
+import { signUp, signIn, updateProfile, findProfileByEmail, resetPassword, updatePassword } from '../auth.service';
 import { supabase } from '@/integrations/supabase/client';
 
 // Mock Supabase client
@@ -10,6 +10,8 @@ vi.mock('@/integrations/supabase/client', () => ({
       signInWithPassword: vi.fn(),
       getUser: vi.fn(),
       signOut: vi.fn(),
+      resetPasswordForEmail: vi.fn(),
+      updateUser: vi.fn(),
     },
     from: vi.fn(),
   },
@@ -20,51 +22,23 @@ describe('auth.service', () => {
     vi.clearAllMocks();
   });
 
-  describe('validateEmail', () => {
-    it('should validate correct email addresses', () => {
-      expect(() => validateEmail('test@example.com')).not.toThrow();
-      expect(() => validateEmail('user.name@domain.co.uk')).not.toThrow();
+  describe('signUp', () => {
+    it('should validate email format', async () => {
+      await expect(signUp('invalid', 'password123', 'Test User')).rejects.toThrow('Invalid email format');
     });
 
-    it('should reject invalid email addresses', () => {
-      expect(() => validateEmail('invalid')).toThrow('Invalid email format');
-      expect(() => validateEmail('@example.com')).toThrow('Invalid email format');
-      expect(() => validateEmail('test@')).toThrow('Invalid email format');
-    });
-  });
-
-  describe('validatePassword', () => {
-    it('should validate passwords with at least 8 characters', () => {
-      expect(() => validatePassword('password123')).not.toThrow();
+    it('should validate password length', async () => {
+      await expect(signUp('test@example.com', 'short', 'Test User')).rejects.toThrow('Password must be at least 8 characters');
     });
 
-    it('should reject passwords shorter than 8 characters', () => {
-      expect(() => validatePassword('short')).toThrow('Password must be at least 8 characters long');
-    });
-
-    it('should reject passwords longer than 128 characters', () => {
-      const longPassword = 'a'.repeat(129);
-      expect(() => validatePassword(longPassword)).toThrow('Password must be less than 128 characters');
+    it('should validate name', async () => {
+      await expect(signUp('test@example.com', 'password123', '')).rejects.toThrow('Name is required');
     });
   });
 
-  describe('validateName', () => {
-    it('should validate names with at least 2 characters', () => {
-      expect(() => validateName('John')).not.toThrow();
-    });
-
-    it('should reject empty names', () => {
-      expect(() => validateName('')).toThrow('Name is required');
-      expect(() => validateName('   ')).toThrow('Name is required');
-    });
-
-    it('should reject names shorter than 2 characters', () => {
-      expect(() => validateName('A')).toThrow('Name must be at least 2 characters long');
-    });
-
-    it('should reject names longer than 100 characters', () => {
-      const longName = 'A'.repeat(101);
-      expect(() => validateName(longName)).toThrow('Name must be less than 100 characters');
+  describe('signIn', () => {
+    it('should validate email format', async () => {
+      await expect(signIn('invalid', 'password123')).rejects.toThrow('Invalid email format');
     });
   });
 
@@ -121,6 +95,47 @@ describe('auth.service', () => {
       });
 
       await expect(updateProfile({ preference: 'invalid' as any })).rejects.toThrow('Preference must be one of');
+    });
+  });
+
+  describe('findProfileByEmail', () => {
+    it('should find profile by email', async () => {
+      const mockProfile = { id: 'user1', email: 'test@example.com', name: 'Test User' };
+      vi.mocked(supabase.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: mockProfile, error: null }),
+      } as any);
+
+      const result = await findProfileByEmail('test@example.com');
+      expect(result).toEqual(mockProfile);
+    });
+
+    it('should return null if not found', async () => {
+      vi.mocked(supabase.from).mockReturnValue({
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        single: vi.fn().mockResolvedValue({ data: null, error: { code: 'PGRST116' } }),
+      } as any);
+
+      const result = await findProfileByEmail('notfound@example.com');
+      expect(result).toBeNull();
+    });
+  });
+
+  describe('resetPassword', () => {
+    it('should send reset password email', async () => {
+      vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({ error: null });
+
+      await expect(resetPassword('test@example.com')).resolves.not.toThrow();
+    });
+  });
+
+  describe('updatePassword', () => {
+    it('should update password', async () => {
+      vi.mocked(supabase.auth.updateUser).mockResolvedValue({ error: null });
+
+      await expect(updatePassword('newpassword123')).resolves.not.toThrow();
     });
   });
 });

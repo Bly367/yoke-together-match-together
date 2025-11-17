@@ -22,7 +22,8 @@ describe('moderation.service', () => {
     });
 
     it('should reject content that is too long', () => {
-      const longContent = 'a'.repeat(5001);
+      // Use varied content to avoid triggering pattern checks
+      const longContent = Array(5001).fill('word').join(' ');
       const result = moderateContent(longContent);
       expect(result.isApproved).toBe(false);
       expect(result.reason).toBe('Message is too long');

@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 import type { Gender, Preference } from './auth.service';
 
 /**
@@ -283,16 +284,17 @@ export async function getUserDuos(userId: string): Promise<DuoWithMembers[]> {
       
       // 42501 is RLS policy violation
       if (simpleError.code === '42501') {
-        console.error('RLS policy violation when fetching duos:', simpleError);
+        logger.error('RLS policy violation when fetching duos', simpleError, { userId });
         throw new Error('Permission denied. Please check your database RLS policies. Error code: 42501');
       }
       
       // Log the error for debugging
-      console.error('Error in simple duos query:', {
+      logger.error('Error in simple duos query', simpleError, {
         code: simpleError.code,
         message: simpleError.message,
         details: simpleError.details,
         hint: simpleError.hint,
+        userId,
       });
       
       throw new Error(`Failed to load duos: ${simpleError.message || 'Unknown error'}${simpleError.code ? ` (Code: ${simpleError.code})` : ''}`);
@@ -326,13 +328,13 @@ export async function getUserDuos(userId: string): Promise<DuoWithMembers[]> {
       
       // 42501 is RLS policy violation
       if (error.code === '42501') {
-        console.error('RLS policy violation when fetching duos with relationships:', error);
+        logger.error('RLS policy violation when fetching duos with relationships', error, { userId });
         throw new Error('Permission denied when loading duo details. Please check your database RLS policies. Error code: 42501');
       }
       
       // PGRST202 is "foreign key relationship error" - might happen if profile doesn't exist
       if (error.code === 'PGRST202' || error.message?.includes('foreign key')) {
-        console.error('Foreign key relationship error when fetching duos:', error);
+        logger.error('Foreign key relationship error when fetching duos', error, { userId });
         // Try to fetch duos without relationships as fallback
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('duos')
@@ -354,11 +356,12 @@ export async function getUserDuos(userId: string): Promise<DuoWithMembers[]> {
       }
       
       // For other errors, log them and throw with more context
-      console.error('Error fetching user duos with relationships:', {
+      logger.error('Error fetching user duos with relationships', error, {
         code: error.code,
         message: error.message,
         details: error.details,
         hint: error.hint,
+        userId,
       });
       
       // Create a more user-friendly error message

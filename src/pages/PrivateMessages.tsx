@@ -10,6 +10,7 @@ import {
 } from "@/hooks/usePrivateMessaging";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { PrivateConversationItem } from "@/components/PrivateConversationItem";
 
@@ -64,7 +65,7 @@ const PrivateMessages = () => {
           
           return userName.includes(query) || messageContent.includes(query);
         } catch (error) {
-          console.error('Error filtering conversation:', error);
+          logger.error('Error filtering conversation', error);
           return false;
         }
       });
@@ -88,7 +89,7 @@ const PrivateMessages = () => {
         // If neither has messages, sort by conversation creation time
         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
       } catch (error) {
-        console.error('Error sorting conversations:', error);
+        logger.error('Error sorting conversations', error);
         return 0;
       }
     });

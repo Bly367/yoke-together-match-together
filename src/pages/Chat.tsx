@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from "react";
+import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate, useParams } from "react-router-dom";
@@ -33,7 +33,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useUploadMessageAttachment } from "@/hooks/useStorage";
-import { formatTime } from "@/lib/utils";
 import { ROUTES } from "@/lib/routes";
 import { cn } from "@/lib/utils";
 import { OptimizedImage } from "@/components/OptimizedImage";
@@ -41,10 +40,15 @@ import { VirtualizedMessageList } from "@/components/VirtualizedMessageList";
 import { MessageBubble } from "@/components/MessageBubble";
 import { formatDate } from "@/lib/utils";
 import { useViewing } from "@/contexts/ViewingContext";
+import { logger } from "@/lib/logger";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
-const Chat = () => {
+/**
+ * Chat page component - optimized with React.memo
+ * Handles messaging between matched duos
+ */
+const ChatComponent = () => {
   const { matchId } = useParams<{ matchId: string }>();
   const navigate = useNavigate();
   const [message, setMessage] = useState("");
@@ -159,7 +163,9 @@ const Chat = () => {
   // Get match display name (custom name or default)
   const matchDisplayName = useMemo(() => {
     if (!match) return 'Group Chat';
-    if (match.name) return match.name;
+    // Check for custom name property (if it exists on match)
+    const customName = (match as { name?: string }).name;
+    if (customName) return customName;
     if (!userDuoIdsSet.size) return 'Group Chat';
     return getMatchName(match, userDuoIdsSet);
   }, [match, userDuoIdsSet]);
@@ -176,7 +182,7 @@ const Chat = () => {
       
       navigate(ROUTES.PRIVATE_CHAT(conversation.id));
     } catch (error) {
-      console.error('Error creating private conversation:', error);
+      logger.error('Error creating private conversation', error);
       toast.error(
         error instanceof Error 
           ? error.message 
@@ -198,7 +204,7 @@ const Chat = () => {
       setRenameValue("");
       toast.success('Chat renamed successfully');
     } catch (error) {
-      console.error('Error renaming chat:', error);
+      logger.error('Error renaming chat', error);
       toast.error(
         error instanceof Error 
           ? error.message 
@@ -219,7 +225,7 @@ const Chat = () => {
       await leaveMatchMutation.mutateAsync(matchId);
       toast.success('Left group chat');
     } catch (error) {
-      console.error('Error leaving chat:', error);
+      logger.error('Error leaving chat', error);
       toast.error(error instanceof Error ? error.message : 'Failed to leave chat');
     }
   };
@@ -431,7 +437,7 @@ const Chat = () => {
         });
       }
     } catch (error: any) {
-      console.error('Failed to send message:', error);
+      logger.error('Failed to send message', error);
       toast.error(error.message || 'Failed to send message');
     }
   };
@@ -453,7 +459,7 @@ const Chat = () => {
       setEditingMessageId(null);
       setEditContent("");
     } catch (error: any) {
-      console.error('Failed to edit message:', error);
+      logger.error('Failed to edit message', error);
       toast.error(error.message || 'Failed to edit message');
     }
   };
@@ -468,7 +474,7 @@ const Chat = () => {
           senderId: user.id,
         });
       } catch (error: any) {
-        console.error('Failed to delete message:', error);
+        logger.error('Failed to delete message', error);
       }
     }
   };
@@ -578,8 +584,14 @@ const Chat = () => {
       <div className="bg-card shadow-sm border-b border-border flex-shrink-0">
         <div className="max-w-4xl mx-auto px-4 py-4">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => navigate(ROUTES.MESSAGES)}>
-              <ArrowLeft className="w-6 h-6" />
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => navigate(ROUTES.MESSAGES)}
+              aria-label="Back to messages"
+            >
+              <ArrowLeft className="w-6 h-6" aria-hidden="true" />
+              <span className="sr-only">Back to messages</span>
             </Button>
             
             <div className="flex-1 flex items-center gap-3 min-w-0">
@@ -590,8 +602,15 @@ const Chat = () => {
                   </h2>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6">
-                        <MoreVertical className="w-4 h-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        className="h-6 w-6"
+                        aria-label="Chat options menu"
+                        aria-haspopup="true"
+                      >
+                        <MoreVertical className="w-4 h-4" aria-hidden="true" />
+                        <span className="sr-only">Chat options</span>
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
@@ -710,6 +729,10 @@ const Chat = () => {
       <div 
         ref={messagesContainerRef}
         className="flex-1 overflow-hidden max-w-4xl mx-auto w-full min-h-0 flex flex-col"
+        role="log"
+        aria-label="Chat messages"
+        aria-live="polite"
+        aria-atomic="false"
       >
         {messages.length > 50 ? (
           <VirtualizedMessageList
@@ -738,7 +761,7 @@ const Chat = () => {
             }}
           >
             {messages.length === 0 ? (
-              <div className="text-center py-20 text-muted-foreground">
+              <div className="text-center py-20 text-muted-foreground" role="status">
                 <p>No messages yet. Start the conversation!</p>
               </div>
             ) : (
@@ -771,7 +794,7 @@ const Chat = () => {
                     showAvatar={!isOwn}
                     showSenderName={!isOwn}
                     showTimestamp={true}
-                    showDateSeparator={showDateSeparator}
+                    showDateSeparator={showDateSeparator ?? false}
                     senderName={msg.sender?.name}
                     senderPhotoUrl={msg.sender?.photo_url}
                     previousMessage={previousMessage}
@@ -811,8 +834,10 @@ const Chat = () => {
                 size="icon"
                 className="h-8 w-8"
                 onClick={handleRemoveAttachment}
+                aria-label={`Remove attachment ${attachment.name}`}
               >
-                <XIcon className="w-4 h-4" />
+                <XIcon className="w-4 h-4" aria-hidden="true" />
+                <span className="sr-only">Remove attachment</span>
               </Button>
             </div>
           )}
@@ -831,13 +856,15 @@ const Chat = () => {
               className="rounded-full w-12 h-12 flex-shrink-0"
               onClick={() => fileInputRef.current?.click()}
               disabled={sendMessageMutation.isPending || uploadAttachmentMutation.isPending}
+              aria-label="Attach file"
               title="Attach file"
             >
               {uploadAttachmentMutation.isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
               ) : (
-                <Paperclip className="w-5 h-5" />
+                <Paperclip className="w-5 h-5" aria-hidden="true" />
               )}
+              <span className="sr-only">Attach file</span>
             </Button>
             
             <div className="flex-1 relative">
@@ -862,7 +889,12 @@ const Chat = () => {
                 className="rounded-full flex-1 pr-16"
                 disabled={sendMessageMutation.isPending || uploadAttachmentMutation.isPending}
                 maxLength={MAX_MESSAGE_LENGTH}
+                aria-label="Message input"
+                aria-describedby="message-input-description"
               />
+              <span id="message-input-description" className="sr-only">
+                Press Enter to send, Shift+Enter for new line. Maximum {MAX_MESSAGE_LENGTH} characters.
+              </span>
               {message.length > MAX_MESSAGE_LENGTH * 0.9 && (
                 <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-xs text-muted-foreground">
                   {message.length}/{MAX_MESSAGE_LENGTH}
@@ -880,12 +912,15 @@ const Chat = () => {
                 uploadAttachmentMutation.isPending ||
                 (!message.trim() && !attachment)
               }
+              aria-label="Send message"
+              aria-describedby="message-input-description"
             >
               {sendMessageMutation.isPending || uploadAttachmentMutation.isPending ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <Loader2 className="w-5 h-5 animate-spin" aria-hidden="true" />
               ) : (
-                <Send className="w-5 h-5" />
+                <Send className="w-5 h-5" aria-hidden="true" />
               )}
+              <span className="sr-only">Send message</span>
             </Button>
           </div>
         </div>
@@ -893,5 +928,10 @@ const Chat = () => {
     </div>
   );
 };
+
+// Memoize component to prevent unnecessary re-renders
+ChatComponent.displayName = 'Chat';
+
+const Chat = React.memo(ChatComponent);
 
 export default Chat;

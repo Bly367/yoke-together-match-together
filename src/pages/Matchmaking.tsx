@@ -1,13 +1,14 @@
-import { useState, useMemo, useRef, useEffect } from "react";
+import React, { useState, useMemo, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Heart, X, Loader2, MessageCircle, User, Filter, RotateCcw, X as XIcon } from "lucide-react";
+import { Heart, X, Loader2, MessageCircle, User, Filter, RotateCcw } from "lucide-react";
 import { toast } from "sonner";
-import { useNavigate, useLocation } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import chickMascot from "@/assets/chick-mascot.png";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserDuos, useActiveDuosForMatching, useActiveDuo } from "@/hooks/useDuos";
+import { logger } from "@/lib/logger";
 import { useSwipe, useSwipedDuoIds, useMatches, useUndoSwipe } from "@/hooks/useMatching";
 import { useQueryClient } from "@tanstack/react-query";
 import { checkMatch } from "@/services/matching.service";
@@ -22,9 +23,8 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import { canDuosMatch, duoMatchesPreferences } from "@/lib/preferences";
-import { useUserPreferences, useUserInterests } from "@/hooks/usePreferences";
+import { useUserPreferences } from "@/hooks/usePreferences";
 
 interface SwipeState {
   x: number;
@@ -34,10 +34,13 @@ interface SwipeState {
   isDragging: boolean;
 }
 
-const Matchmaking = () => {
+/**
+ * Matchmaking page component - optimized with React.memo
+ * Handles duo swiping and matching functionality
+ */
+const MatchmakingComponent = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isMatched, setIsMatched] = useState(false);
-  const [matchedDuoId, setMatchedDuoId] = useState<string | null>(null);
   const [lastSwipe, setLastSwipe] = useState<{ duoId: string; action: 'like' | 'pass' } | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -55,20 +58,16 @@ const Matchmaking = () => {
   });
   const cardRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
-  const location = useLocation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const { location: userLocation } = useCurrentLocation();
-  
-  const isDiscover = location.pathname === ROUTES.MATCHMAKING;
 
   // Get user's duos and active duo
   const { data: userDuos, isLoading: duosLoading, isError: duosError, error: duosErrorDetails } = useUserDuos();
   const userDuo = useActiveDuo();
 
-  // Get user preferences and interests for advanced filtering
+  // Get user preferences for advanced filtering
   const { data: userPreferences } = useUserPreferences(user?.id);
-  const { data: userInterests = [] } = useUserInterests(user?.id);
 
   // Get matches for badge count
   const { data: matches } = useMatches();
@@ -98,7 +97,7 @@ const Matchmaking = () => {
       }
       
       // Advanced preferences filter (dealbreakers are hard filters)
-      const matchResult = duoMatchesPreferences(duo, userPreferences || null, userCoords);
+      const matchResult = duoMatchesPreferences(duo, userPreferences || null, userCoords || undefined);
       if (!matchResult.matches) {
         return false;
       }
@@ -263,7 +262,7 @@ const Matchmaking = () => {
     });
   }, [currentIndex]);
 
-  const handleSwipe = async (liked: boolean) => {
+  const handleSwipe = useCallback(async (liked: boolean) => {
     if (!userDuo || !currentDuo) {
       toast.error("Please create a duo first!");
       navigate(ROUTES.DUO_SETUP);
@@ -285,7 +284,6 @@ const Matchmaking = () => {
         const match = await checkMatch(userDuo.id, currentDuo.id);
         if (match) {
           setIsMatched(true);
-          setMatchedDuoId(currentDuo.id);
           toast.success("It's a match! 🎉");
           setTimeout(() => {
             setIsMatched(false);
@@ -309,9 +307,9 @@ const Matchmaking = () => {
     } catch (error: any) {
       toast.error(error.message || "Failed to swipe");
     }
-  };
+  }, [userDuo, currentDuo, swipeMutation, currentIndex, availableDuos.length, queryClient, navigate]);
 
-  const handleUndo = async () => {
+  const handleUndo = useCallback(async () => {
     if (!lastSwipe || !userDuo) return;
 
     try {
@@ -330,7 +328,32 @@ const Matchmaking = () => {
     } catch (error: any) {
       toast.error(error.message || "Failed to undo swipe");
     }
-  };
+  }, [lastSwipe, userDuo, undoSwipeMutation, currentIndex]);
+
+  // Keyboard navigation for swiping
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Don't trigger shortcuts when typing in inputs
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable) {
+        return;
+      }
+
+      if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+        e.preventDefault();
+        handleSwipe(false);
+      } else if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+        e.preventDefault();
+        handleSwipe(true);
+      } else if (e.key === 'u' || e.key === 'U') {
+        e.preventDefault();
+        if (lastSwipe) handleUndo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentDuo, lastSwipe, userDuo, handleSwipe, handleUndo]);
 
   // Calculate rotation and opacity based on swipe
   const rotation = swipeState.x * 0.1;
@@ -347,8 +370,7 @@ const Matchmaking = () => {
   // Show error state if duos query failed (but allow empty duos - that's not an error)
   if (duosError && userDuos === undefined) {
     // Log error details for debugging
-    console.error('Duos error details:', {
-      error: duosErrorDetails,
+    logger.error('Duos error details', duosErrorDetails, {
       isError: duosErrorDetails instanceof Error,
       message: duosErrorDetails instanceof Error ? duosErrorDetails.message : String(duosErrorDetails),
     });
@@ -422,11 +444,17 @@ const Matchmaking = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-secondary/20 to-background p-4 py-8 pb-24">
       {/* Match Overlay */}
       {isMatched && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center animate-hatch">
+        <div 
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center animate-hatch"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="match-title"
+          aria-describedby="match-description"
+        >
           <div className="bg-card rounded-3xl p-12 text-center space-y-4 animate-hatch shadow-2xl">
-            <div className="text-6xl">🎉</div>
-            <h2 className="text-4xl font-bold text-foreground">It's a Match!</h2>
-            <p className="text-muted-foreground">You can now chat with this duo</p>
+            <div className="text-6xl" aria-hidden="true">🎉</div>
+            <h2 id="match-title" className="text-4xl font-bold text-foreground">It's a Match!</h2>
+            <p id="match-description" className="text-muted-foreground">You can now chat with this duo</p>
           </div>
         </div>
       )}
@@ -434,13 +462,21 @@ const Matchmaking = () => {
       {/* Header */}
       <div className="max-w-lg mx-auto mb-6">
         <div className="flex items-center justify-between mb-4">
-          <img src={chickMascot} alt="Yoke" className="w-12 h-12" />
+          <img src={chickMascot} alt="Yoke mascot" className="w-12 h-12" />
           <h1 className="text-2xl font-bold text-foreground">Discover Duos</h1>
           <div className="flex gap-2">
             <Popover open={showFilters} onOpenChange={setShowFilters}>
               <PopoverTrigger asChild>
-                <Button variant="ghost" size="icon" className="relative">
-                  <Filter className="w-5 h-5" />
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="relative"
+                  aria-label="Open filters"
+                  aria-expanded={showFilters}
+                  aria-haspopup="true"
+                >
+                  <Filter className="w-5 h-5" aria-hidden="true" />
+                  <span className="sr-only">Open filters</span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-80">
@@ -521,13 +557,15 @@ const Matchmaking = () => {
               size="icon" 
               onClick={() => navigate(ROUTES.MATCHES)}
               className="relative"
-              title="View Messages & Matches"
+              aria-label={`View messages and matches${matchesCount > 0 ? `, ${matchesCount} new` : ''}`}
             >
-              <MessageCircle className="w-6 h-6" />
+              <MessageCircle className="w-6 h-6" aria-hidden="true" />
+              <span className="sr-only">View messages and matches</span>
               {matchesCount > 0 && (
                 <Badge 
                   variant="default" 
                   className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  aria-label={`${matchesCount} new matches`}
                 >
                   {matchesCount > 9 ? '9+' : matchesCount}
                 </Badge>
@@ -545,9 +583,10 @@ const Matchmaking = () => {
               onClick={handleUndo}
               disabled={undoSwipeMutation.isPending}
               className="gap-2"
+              aria-label={`Undo ${lastSwipe.action === 'like' ? 'like' : 'pass'}`}
             >
-              <RotateCcw className="w-4 h-4" />
-              Undo {lastSwipe.action === 'like' ? 'Like' : 'Pass'}
+              <RotateCcw className="w-4 h-4" aria-hidden="true" />
+              <span>Undo {lastSwipe.action === 'like' ? 'Like' : 'Pass'}</span>
             </Button>
           </div>
         )}
@@ -572,10 +611,12 @@ const Matchmaking = () => {
           onMouseMove={handleMouseMove}
           onMouseUp={handleMouseUp}
           onMouseLeave={handleMouseUp}
+          role="article"
+          aria-label={`Duo card: ${currentDuo.member1.name} and ${currentDuo.member2.name}`}
         >
           {/* Swipe indicators */}
           {swipeState.isDragging && (
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-10" aria-hidden="true">
               {swipeState.x > 50 && (
                 <div className="bg-primary/20 rounded-full p-4 border-4 border-primary">
                   <Heart className="w-12 h-12 text-primary" />
@@ -595,9 +636,9 @@ const Matchmaking = () => {
               <div className="w-32 h-32 rounded-full bg-primary/20 mx-auto flex items-center justify-center shadow-lg overflow-hidden">
                 <OptimizedImage
                   src={currentDuo.member1.photo_url}
-                  alt={currentDuo.member1.name}
+                  alt={`${currentDuo.member1.name}${currentDuo.member1.age ? `, age ${currentDuo.member1.age}` : ''}`}
                   className="w-full h-full"
-                  fallbackIcon={<User className="w-16 h-16 text-primary" />}
+                  fallbackIcon={<User className="w-16 h-16 text-primary" aria-hidden="true" />}
                 />
               </div>
               <p className="font-semibold text-lg">
@@ -609,9 +650,9 @@ const Matchmaking = () => {
               <div className="w-32 h-32 rounded-full bg-primary/20 mx-auto flex items-center justify-center shadow-lg overflow-hidden">
                 <OptimizedImage
                   src={currentDuo.member2.photo_url}
-                  alt={currentDuo.member2.name}
+                  alt={`${currentDuo.member2.name}${currentDuo.member2.age ? `, age ${currentDuo.member2.age}` : ''}`}
                   className="w-full h-full"
-                  fallbackIcon={<User className="w-16 h-16 text-primary" />}
+                  fallbackIcon={<User className="w-16 h-16 text-primary" aria-hidden="true" />}
                 />
               </div>
               <p className="font-semibold text-lg">
@@ -651,15 +692,18 @@ const Matchmaking = () => {
         </div>
 
         {/* Action Buttons */}
-        <div className="flex gap-4 justify-center mt-8">
+        <div className="flex gap-4 justify-center mt-8" role="group" aria-label="Swipe actions">
           <Button
             size="lg"
             variant="outline"
             className="w-20 h-20 rounded-full border-2 hover:scale-110 transition-transform"
             onClick={() => handleSwipe(false)}
             disabled={swipeMutation.isPending}
+            aria-label="Pass on this duo"
+            title="Pass (Left Arrow or A key)"
           >
-            <X className="w-8 h-8 text-destructive" />
+            <X className="w-8 h-8 text-destructive" aria-hidden="true" />
+            <span className="sr-only">Pass</span>
           </Button>
           <Button
             size="lg"
@@ -667,17 +711,21 @@ const Matchmaking = () => {
             className="w-24 h-24 rounded-full hover:scale-110 transition-transform"
             onClick={() => handleSwipe(true)}
             disabled={swipeMutation.isPending}
+            aria-label="Like this duo"
+            title="Like (Right Arrow or D key)"
           >
             {swipeMutation.isPending ? (
-              <Loader2 className="w-10 h-10 animate-spin" />
+              <Loader2 className="w-10 h-10 animate-spin" aria-hidden="true" />
             ) : (
-              <Heart className="w-10 h-10" />
+              <Heart className="w-10 h-10" aria-hidden="true" />
             )}
+            <span className="sr-only">Like</span>
           </Button>
         </div>
 
         {/* Progress */}
-        <div className="text-center mt-4 text-sm text-muted-foreground">
+        <div className="text-center mt-4 text-sm text-muted-foreground" role="status" aria-live="polite">
+          <span className="sr-only">Progress: </span>
           {currentIndex + 1} of {availableDuos.length} duos
         </div>
       </div>
@@ -687,5 +735,10 @@ const Matchmaking = () => {
     </div>
   );
 };
+
+// Memoize component to prevent unnecessary re-renders
+MatchmakingComponent.displayName = 'Matchmaking';
+
+const Matchmaking = React.memo(MatchmakingComponent);
 
 export default Matchmaking;

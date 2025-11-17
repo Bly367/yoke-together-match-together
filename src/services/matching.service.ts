@@ -35,6 +35,31 @@ export interface Match {
 /**
  * Swipe on a duo with rate limiting
  */
+/**
+ * Swipe on a duo (like or pass)
+ * 
+ * Records a swipe action (like or pass) on a duo. Includes client-side rate limiting
+ * to prevent spam (100 swipes per hour). Automatically checks for matches after a like.
+ * 
+ * @param swiperDuoId - ID of the duo performing the swipe
+ * @param swipedDuoId - ID of the duo being swiped on
+ * @param action - Swipe action: 'like' or 'pass'
+ * @returns Promise resolving to the created Swipe record
+ * @throws {Error} If rate limit is exceeded or swipe creation fails
+ * @throws {Error} If match check fails after a like
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   const swipe = await swipeOnDuo('duo-1', 'duo-2', 'like');
+ *   console.log('Swiped:', swipe.action);
+ * } catch (error) {
+ *   if (error.message.includes('Rate limit')) {
+ *     console.log('Too many swipes, please wait');
+ *   }
+ * }
+ * ```
+ */
 export async function swipeOnDuo(swiperDuoId: string, swipedDuoId: string, action: SwipeAction): Promise<Swipe> {
   // Import rate limiting service (dynamic import to avoid circular dependencies)
   const { checkRateLimit, getRateLimitKey, RATE_LIMITS } = await import('./rateLimit.service');
@@ -91,6 +116,22 @@ export async function swipeOnDuo(swiperDuoId: string, swipedDuoId: string, actio
 /**
  * Get matches for a user's duos
  * Optimized: Single query using OR condition instead of two separate queries
+ */
+/**
+ * Get all active matches for a user
+ * 
+ * Retrieves all matches where the user's duos are involved. Uses optimized single query
+ * with OR condition to fetch matches efficiently. Returns matches ordered by most recent first.
+ * 
+ * @param userId - ID of the user whose matches to retrieve
+ * @returns Promise resolving to array of Match objects with duo and profile information
+ * @throws {Error} If query fails or user has no duos
+ * 
+ * @example
+ * ```typescript
+ * const matches = await getUserMatches('user-id');
+ * console.log(`User has ${matches.length} matches`);
+ * ```
  */
 export async function getUserMatches(userId: string): Promise<Match[]> {
   // Get user's duos
@@ -245,7 +286,20 @@ export async function getUserMatches(userId: string): Promise<Match[]> {
 }
 
 /**
- * Get swiped duo IDs for a duo
+ * Get all duo IDs that a duo has swiped on
+ * 
+ * Retrieves the list of duo IDs that the specified duo has already swiped on.
+ * Useful for filtering out already-swiped duos from the matchmaking feed.
+ * 
+ * @param duoId - ID of the duo whose swipe history to retrieve
+ * @returns Promise resolving to array of swiped duo IDs
+ * @throws {Error} If query fails
+ * 
+ * @example
+ * ```typescript
+ * const swipedIds = await getSwipedDuoIds('duo-1');
+ * console.log(`Already swiped on ${swipedIds.length} duos`);
+ * ```
  */
 export async function getSwipedDuoIds(duoId: string): Promise<string[]> {
   const { data, error } = await supabase
@@ -258,7 +312,21 @@ export async function getSwipedDuoIds(duoId: string): Promise<string[]> {
 }
 
 /**
- * Undo a swipe (delete the swipe record)
+ * Undo a swipe by deleting the swipe record
+ * 
+ * Removes a previously recorded swipe, allowing the user to swipe again on the same duo.
+ * Useful for "undo" functionality in the matchmaking interface.
+ * 
+ * @param swiperDuoId - ID of the duo who performed the swipe
+ * @param swipedDuoId - ID of the duo that was swiped on
+ * @returns Promise that resolves when swipe is deleted
+ * @throws {Error} If deletion fails
+ * 
+ * @example
+ * ```typescript
+ * await undoSwipe('duo-1', 'duo-2');
+ * // Swipe record deleted, can swipe again
+ * ```
  */
 export async function undoSwipe(swiperDuoId: string, swipedDuoId: string): Promise<void> {
   const { error } = await supabase
@@ -272,7 +340,24 @@ export async function undoSwipe(swiperDuoId: string, swipedDuoId: string): Promi
 
 /**
  * Check if two duos have matched with retry logic
- * Uses exponential backoff to handle race conditions when match is created by trigger
+ * 
+ * Checks if a match exists between two duos. Uses exponential backoff retry logic
+ * to handle race conditions when a match is created by a database trigger.
+ * 
+ * @param duo1Id - First duo ID
+ * @param duo2Id - Second duo ID
+ * @param maxRetries - Maximum number of retry attempts (default: 5)
+ * @param initialDelay - Initial delay in milliseconds before first retry (default: 100)
+ * @returns Promise resolving to Match object if found, null otherwise
+ * @throws {Error} If query fails (excluding "not found" errors)
+ * 
+ * @example
+ * ```typescript
+ * const match = await checkMatch('duo-1', 'duo-2');
+ * if (match) {
+ *   console.log('Match found!', match.id);
+ * }
+ * ```
  */
 export async function checkMatch(
   duo1Id: string,
@@ -320,6 +405,19 @@ export async function checkMatch(
 
 /**
  * Unmatch (deactivate) a match
+ * 
+ * Deactivates a match by setting is_active to false. This removes the match
+ * from both users' match lists but preserves the match history.
+ * 
+ * @param matchId - ID of the match to unmatch
+ * @returns Promise that resolves when match is deactivated
+ * @throws {Error} If update fails
+ * 
+ * @example
+ * ```typescript
+ * await unmatch('match-id');
+ * // Match is now inactive
+ * ```
  */
 export async function unmatch(matchId: string): Promise<void> {
   const { error } = await supabase
@@ -332,7 +430,21 @@ export async function unmatch(matchId: string): Promise<void> {
 
 /**
  * Rename a match/group chat
- * Note: RLS policies ensure only participants can update matches
+ * 
+ * Updates the custom name for a match. RLS policies ensure only participants
+ * can rename matches. Name is trimmed and limited to 50 characters.
+ * 
+ * @param matchId - ID of the match to rename
+ * @param name - New name for the match (max 50 characters, will be trimmed)
+ * @returns Promise resolving to updated Match object
+ * @throws {Error} If name exceeds 50 characters
+ * @throws {Error} If update fails or user doesn't have permission
+ * 
+ * @example
+ * ```typescript
+ * const updatedMatch = await renameMatch('match-id', 'Our Group Chat');
+ * console.log('Renamed to:', updatedMatch.name);
+ * ```
  */
 export async function renameMatch(matchId: string, name: string): Promise<Match> {
   // Validate name length
@@ -367,6 +479,22 @@ export async function renameMatch(matchId: string, name: string): Promise<Match>
 
 /**
  * Leave a match (mark user as having left)
+ * 
+ * Marks a user as having left a match by updating the match_participants table.
+ * Verifies that the user is a participant before allowing them to leave.
+ * 
+ * @param matchId - ID of the match to leave
+ * @param userId - ID of the user leaving the match
+ * @returns Promise that resolves when user is marked as having left
+ * @throws {Error} If user is not part of any active duo
+ * @throws {Error} If user is not a participant in the match
+ * @throws {Error} If update fails
+ * 
+ * @example
+ * ```typescript
+ * await leaveMatch('match-id', 'user-id');
+ * // User is now marked as having left
+ * ```
  */
 export async function leaveMatch(matchId: string, userId: string): Promise<void> {
   // Get user's duos to find which duo they're in
@@ -415,6 +543,24 @@ export async function leaveMatch(matchId: string, userId: string): Promise<void>
 
 /**
  * Subscribe to new matches for a user's duos
+ * 
+ * Sets up a real-time subscription to receive notifications when new matches
+ * are created involving any of the user's active duos. Returns an unsubscribe
+ * function to clean up the subscription.
+ * 
+ * @param userId - ID of the user to subscribe for
+ * @param callback - Function to call when a new match is created
+ * @returns Unsubscribe function to stop receiving updates
+ * 
+ * @example
+ * ```typescript
+ * const unsubscribe = subscribeToMatches('user-id', (match) => {
+ *   console.log('New match!', match.id);
+ * });
+ * 
+ * // Later, to stop listening:
+ * unsubscribe();
+ * ```
  */
 export function subscribeToMatches(
   userId: string,

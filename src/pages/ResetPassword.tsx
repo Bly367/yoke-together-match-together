@@ -11,6 +11,7 @@ import { useUpdatePassword } from "@/hooks/useAuth";
 import { ROUTES } from "@/lib/routes";
 import { getPasswordStrength } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 const ResetPassword = () => {
   const [password, setPassword] = useState("");
@@ -42,7 +43,7 @@ const ResetPassword = () => {
           }
         }
       } catch (error) {
-        console.error("Error checking session:", error);
+        logger.error("Error checking session", error);
         toast.error("Invalid or expired reset link. Please request a new one.");
         setTimeout(() => navigate(ROUTES.FORGOT_PASSWORD), 2000);
       } finally {

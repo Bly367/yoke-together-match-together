@@ -30,6 +30,7 @@ This index helps you navigate all documentation for the Yoke project.
 - **[DATABASE_QUICK_START.md](../DATABASE_QUICK_START.md)** - Quick database setup
 - **[SETUP_SUPABASE.md](../SETUP_SUPABASE.md)** - Supabase setup guide
 - **[QUICK_SUPABASE_SETUP.md](../QUICK_SUPABASE_SETUP.md)** - Quick Supabase setup
+- **[SUPABASE_LINTER_WARNINGS.md](SUPABASE_LINTER_WARNINGS.md)** - Expected linter warnings and why they're safe to ignore
 
 ---
 

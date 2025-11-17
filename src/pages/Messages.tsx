@@ -1,4 +1,4 @@
-import { useMemo, useState, useRef, useEffect } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate } from "react-router-dom";
@@ -14,6 +14,7 @@ import { useQuery } from "@tanstack/react-query";
 import { getLastMessagesForMatches } from "@/services/chat.service";
 import { LAST_MESSAGES_QUERY_KEY } from "@/hooks/useChat";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 import { BottomNavigation } from "@/components/BottomNavigation";
 import { VirtualizedMatchList } from "@/components/VirtualizedMatchList";
 
@@ -23,7 +24,11 @@ import { VirtualizedMatchList } from "@/components/VirtualizedMatchList";
  * Displays all matches with their last messages, sorted by most recent activity.
  * Optimized for messaging with real-time updates.
  */
-const Messages = () => {
+/**
+ * Messages page component - optimized with React.memo
+ * Displays list of matches with last message previews
+ */
+const MessagesComponent = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { data: matches, isLoading: matchesLoading, isError: matchesError, error: matchesErrorDetails } = useMatches();
@@ -79,7 +84,7 @@ const Messages = () => {
           
           return matchName.includes(query) || messageContent.includes(query);
         } catch (error) {
-          console.error('Error filtering match:', error);
+          logger.error('Error filtering match', error);
           return false;
         }
       });
@@ -103,7 +108,7 @@ const Messages = () => {
         // If neither has messages, sort by match time
         return new Date(b.matched_at).getTime() - new Date(a.matched_at).getTime();
       } catch (error) {
-        console.error('Error sorting matches:', error);
+        logger.error('Error sorting matches', error);
         return 0;
       }
     });
@@ -122,12 +127,12 @@ const Messages = () => {
           return {
             match,
             otherDuo,
-            lastMessage: lastMessages[match.id],
+            lastMessage: lastMessages[match.id] || undefined,
             unreadCount: unreadCounts[match.id] || 0,
             matchName: getMatchName(match, userDuoIdsSet),
           };
         } catch (error) {
-          console.error('Error processing match:', error, match);
+          logger.error('Error processing match', error, { matchId: match?.id });
           return null;
         }
       })
@@ -149,7 +154,7 @@ const Messages = () => {
 
   // Debug: Log current state (must be before any conditional returns)
   useEffect(() => {
-    console.log('Messages page state:', {
+    logger.debug('Messages page state', {
       matches: matches?.length || 0,
       userDuos: userDuos?.length || 0,
       matchItems: matchItems.length,
@@ -235,17 +240,22 @@ const Messages = () => {
         <div className="max-w-4xl mx-auto px-4 py-4 space-y-3">
           <div className="flex items-center justify-between">
             <h1 className="text-2xl font-bold text-foreground">Messages</h1>
-            <img src={chickMascot} alt="Yoke" className="w-10 h-10" />
+            <img src={chickMascot} alt="Yoke mascot" className="w-10 h-10" />
           </div>
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" aria-hidden="true" />
             <Input
               placeholder="Search matches or messages..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-9 rounded-full"
+              aria-label="Search matches or messages"
+              aria-describedby="search-description"
             />
+            <span id="search-description" className="sr-only">
+              Search through your matches and message history
+            </span>
           </div>
         </div>
       </div>
@@ -254,13 +264,15 @@ const Messages = () => {
       <div 
         ref={messagesListRef}
         className="max-w-4xl mx-auto pb-24 overflow-hidden"
+        role="list"
+        aria-label="Matches list"
       >
         {!matches || matches.length === 0 ? (
-          <div className="text-center py-20 space-y-4 px-4">
-            <img src={chickMascot} alt="No messages" className="w-24 h-24 mx-auto animate-bounce-soft opacity-50" />
+          <div className="text-center py-20 space-y-4 px-4" role="status">
+            <img src={chickMascot} alt="" className="w-24 h-24 mx-auto animate-bounce-soft opacity-50" aria-hidden="true" />
             <h2 className="text-xl font-semibold text-foreground">No matches yet</h2>
             <p className="text-muted-foreground">Start swiping to find your duo matches!</p>
-            <Button variant="yolk" onClick={() => navigate(ROUTES.MATCHMAKING)}>
+            <Button variant="yolk" onClick={() => navigate(ROUTES.MATCHMAKING)} aria-label="Go to matchmaking to start swiping">
               Start Swiping
             </Button>
           </div>
@@ -283,7 +295,16 @@ const Messages = () => {
                 <div
                   key={match.id}
                   onClick={() => navigate(ROUTES.CHAT(match.id))}
-                  className="bg-card rounded-3xl p-4 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-soft)] transition-all cursor-pointer animate-slide-up group"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      navigate(ROUTES.CHAT(match.id));
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`${matchItem.matchName}${hasUnread ? `, ${unreadCount} unread message${unreadCount > 1 ? 's' : ''}` : ''}${lastMessage ? `. Last message: ${lastMessage.content}` : ''}`}
+                  className="bg-card rounded-3xl p-4 shadow-[var(--shadow-card)] hover:shadow-[var(--shadow-soft)] transition-all cursor-pointer animate-slide-up group focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                 >
                   <div className="flex items-center gap-4">
                     {/* Duo Avatars */}
@@ -360,6 +381,11 @@ const Messages = () => {
     </div>
   );
 };
+
+// Memoize component to prevent unnecessary re-renders
+MessagesComponent.displayName = 'Messages';
+
+const Messages = React.memo(MessagesComponent);
 
 export default Messages;
 

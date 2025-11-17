@@ -1,6 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import { useAuth } from './useAuth';
 import { expireOldRequests } from '@/services/duoRequest.service';
+import { logger } from '@/lib/logger';
 
 /**
  * Configuration for duo request expiration checks
@@ -37,7 +38,7 @@ export function useExpireDuoRequests(
     } catch (error) {
       // Silently handle errors - expiration is a background task
       // Log to console for debugging but don't disrupt user experience
-      console.error('Error expiring duo requests:', error);
+      logger.error('Error expiring duo requests', error);
     } finally {
       isCheckingRef.current = false;
     }

@@ -13,6 +13,7 @@ import {
   type DuoWithMembers,
 } from '@/services/duo.service';
 import { useAuth } from './useAuth';
+import { logger } from '@/lib/logger';
 
 /**
  * Query keys
@@ -37,7 +38,7 @@ export function useUserDuos() {
         return await getUserDuos(user!.id);
       } catch (error) {
         // Log error for debugging
-        console.error('Error in useUserDuos queryFn:', error);
+        logger.error('Error in useUserDuos queryFn', error);
         throw error;
       }
     },

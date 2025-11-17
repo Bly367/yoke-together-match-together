@@ -29,6 +29,8 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
     throw new Error(errorMessage);
   } else {
     // In development, log error but allow app to continue
+    // Note: Logger not imported here to avoid circular dependency
+    // This is acceptable as it's only for environment validation
     console.error(errorMessage);
   }
 }

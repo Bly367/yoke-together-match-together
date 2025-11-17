@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from '@/lib/logger';
 
 /**
  * Message type
@@ -46,6 +47,25 @@ export interface PaginatedMessages {
  * @param options - Pagination options (limit, offset)
  * @returns Paginated messages
  */
+/**
+ * Get paginated messages for a match
+ * 
+ * Retrieves messages for a specific match with pagination support. Messages are
+ * returned in descending order (newest first). Includes sender profile information.
+ * 
+ * @param matchId - ID of the match to get messages for
+ * @param options - Pagination options
+ * @param options.limit - Maximum number of messages to return (default: 50)
+ * @param options.offset - Number of messages to skip (default: 0)
+ * @returns Promise resolving to paginated messages with total count
+ * @throws {Error} If query fails
+ * 
+ * @example
+ * ```typescript
+ * const result = await getMatchMessages('match-id', { limit: 20, offset: 0 });
+ * console.log(`Found ${result.total} messages, showing ${result.messages.length}`);
+ * ```
+ */
 export async function getMatchMessages(
   matchId: string,
   options: MessagePaginationOptions = {}
@@ -73,8 +93,7 @@ export async function getMatchMessages(
     .range(offset, offset + limit - 1);
 
   if (error) {
-    // Log error for debugging
-    console.error('Error fetching messages:', error);
+    logger.error('Error fetching messages', error, { matchId, options });
     throw error;
   }
 
@@ -118,6 +137,22 @@ export async function getMatchMessages(
  * Get all messages for a match (backward compatibility)
  * @deprecated Use getMatchMessages with pagination instead
  */
+/**
+ * Get all messages for a match (no pagination)
+ * 
+ * Retrieves all messages for a specific match. Useful when you need the complete
+ * message history. Messages are returned in descending order (newest first).
+ * 
+ * @param matchId - ID of the match to get messages for
+ * @returns Promise resolving to array of all messages
+ * @throws {Error} If query fails
+ * 
+ * @example
+ * ```typescript
+ * const messages = await getAllMatchMessages('match-id');
+ * console.log(`Total messages: ${messages.length}`);
+ * ```
+ */
 export async function getAllMatchMessages(matchId: string): Promise<Message[]> {
   const result = await getMatchMessages(matchId, { limit: 1000, offset: 0 });
   return result.messages;
@@ -125,7 +160,36 @@ export async function getAllMatchMessages(matchId: string): Promise<Message[]> {
 
 /**
  * Send a message with content moderation and rate limiting
- * Supports optional file attachments
+ * 
+ * Sends a message in a match with automatic content moderation and rate limiting.
+ * Supports optional file attachments. Content is validated and sanitized before sending.
+ * 
+ * @param matchId - ID of the match to send message to
+ * @param senderId - ID of the user sending the message
+ * @param content - Message content (can be empty if attachment is provided)
+ * @param attachment - Optional file attachment
+ * @param attachment.url - URL of the attached file
+ * @param attachment.type - MIME type of the attachment
+ * @param attachment.name - Name of the attached file
+ * @param attachment.size - Size of the attachment in bytes
+ * @returns Promise resolving to the created Message object
+ * @throws {Error} If content validation fails
+ * @throws {Error} If rate limit is exceeded
+ * @throws {Error} If message creation fails
+ * 
+ * @example
+ * ```typescript
+ * const message = await sendMessage('match-id', 'user-id', 'Hello!');
+ * console.log('Message sent:', message.id);
+ * 
+ * // With attachment:
+ * await sendMessage('match-id', 'user-id', '', {
+ *   url: 'https://example.com/file.jpg',
+ *   type: 'image/jpeg',
+ *   name: 'photo.jpg',
+ *   size: 1024000
+ * });
+ * ```
  */
 export async function sendMessage(
   matchId: string,
@@ -186,6 +250,22 @@ export async function sendMessage(
  * Get last message for each match (for matches list preview)
  * Excludes deleted messages
  */
+/**
+ * Get the last message for multiple matches
+ * 
+ * Efficiently retrieves the most recent message for each match in a single query.
+ * Returns a map of match IDs to their last message (or null if no messages exist).
+ * 
+ * @param matchIds - Array of match IDs to get last messages for
+ * @returns Promise resolving to object mapping match IDs to their last message
+ * @throws {Error} If query fails
+ * 
+ * @example
+ * ```typescript
+ * const lastMessages = await getLastMessagesForMatches(['match-1', 'match-2']);
+ * console.log('Last message for match-1:', lastMessages['match-1']?.content);
+ * ```
+ */
 export async function getLastMessagesForMatches(matchIds: string[]): Promise<Record<string, Message | null>> {
   if (matchIds.length === 0) return {};
 
@@ -221,6 +301,26 @@ export async function getLastMessagesForMatches(matchIds: string[]): Promise<Rec
 
 /**
  * Subscribe to messages for a match (INSERT, UPDATE, DELETE)
+ */
+/**
+ * Subscribe to new messages for a specific match
+ * 
+ * Sets up a real-time subscription to receive new messages for a match.
+ * Returns an unsubscribe function to clean up the subscription.
+ * 
+ * @param matchId - ID of the match to subscribe to
+ * @param callback - Function to call when a new message is received
+ * @returns Unsubscribe function to stop receiving updates
+ * 
+ * @example
+ * ```typescript
+ * const unsubscribe = subscribeToMessages('match-id', (message) => {
+ *   console.log('New message:', message.content);
+ * });
+ * 
+ * // Later, to stop listening:
+ * unsubscribe();
+ * ```
  */
 export function subscribeToMessages(
   matchId: string,
@@ -285,6 +385,28 @@ export function subscribeToMessages(
 /**
  * Subscribe to messages for multiple matches (INSERT, UPDATE)
  * Useful for updating the matches list when messages arrive or are edited
+ */
+/**
+ * Subscribe to messages for multiple matches
+ * 
+ * Sets up real-time subscriptions for multiple matches at once. More efficient
+ * than creating individual subscriptions for each match. Returns an unsubscribe
+ * function to clean up all subscriptions.
+ * 
+ * @param matchIds - Array of match IDs to subscribe to
+ * @param callback - Function to call when a new message is received
+ * @returns Unsubscribe function to stop receiving updates for all matches
+ * 
+ * @example
+ * ```typescript
+ * const unsubscribe = subscribeToAllMatchMessages(
+ *   ['match-1', 'match-2'],
+ *   (message) => console.log('New message:', message.content)
+ * );
+ * 
+ * // Later, to stop listening:
+ * unsubscribe();
+ * ```
  */
 export function subscribeToAllMatchMessages(
   matchIds: string[],
@@ -392,6 +514,24 @@ export async function editMessage(
  * @param senderId - The sender ID (for authorization)
  * @returns Deleted message
  */
+/**
+ * Delete a message
+ * 
+ * Soft-deletes a message by setting deleted_at timestamp. Only the sender can
+ * delete their own messages. The message remains in the database for audit purposes.
+ * 
+ * @param messageId - ID of the message to delete
+ * @param senderId - ID of the user deleting the message (must be the sender)
+ * @returns Promise resolving to deleted Message object
+ * @throws {Error} If user is not the sender
+ * @throws {Error} If deletion fails
+ * 
+ * @example
+ * ```typescript
+ * const deleted = await deleteMessage('message-id', 'user-id');
+ * console.log('Message deleted at:', deleted.deleted_at);
+ * ```
+ */
 export async function deleteMessage(messageId: string, senderId: string): Promise<Message> {
   const { data, error } = await supabase
     .from('messages')
@@ -415,6 +555,23 @@ export async function deleteMessage(messageId: string, senderId: string): Promis
  * @param matchId - The match ID
  * @param userId - The user ID
  * @param messageIds - Optional array of specific message IDs to mark as read (if not provided, marks all unread)
+ */
+/**
+ * Mark messages as read for a user in a match
+ * 
+ * Updates the last_read_at timestamp for a user in a match, marking all messages
+ * up to that point as read. Used to calculate unread message counts.
+ * 
+ * @param matchId - ID of the match
+ * @param userId - ID of the user marking messages as read
+ * @returns Promise that resolves when read receipt is updated
+ * @throws {Error} If update fails
+ * 
+ * @example
+ * ```typescript
+ * await markMessagesAsRead('match-id', 'user-id');
+ * // All messages in this match are now marked as read
+ * ```
  */
 export async function markMessagesAsRead(
   matchId: string,
@@ -474,6 +631,23 @@ export async function markMessagesAsRead(
  * @param userId - The user ID
  * @returns Unread message count
  */
+/**
+ * Get unread message count for a user in a match
+ * 
+ * Calculates the number of unread messages for a user in a specific match.
+ * Messages are considered unread if they were created after the user's last_read_at timestamp.
+ * 
+ * @param matchId - ID of the match
+ * @param userId - ID of the user
+ * @returns Promise resolving to number of unread messages
+ * @throws {Error} If query fails
+ * 
+ * @example
+ * ```typescript
+ * const unread = await getUnreadCount('match-id', 'user-id');
+ * console.log(`You have ${unread} unread messages`);
+ * ```
+ */
 export async function getUnreadCount(matchId: string, userId: string): Promise<number> {
   const { data, error } = await supabase.rpc('get_unread_count', {
     match_uuid: matchId,
@@ -489,6 +663,23 @@ export async function getUnreadCount(matchId: string, userId: string): Promise<n
  * @param matchIds - Array of match IDs
  * @param userId - The user ID
  * @returns Record of match ID to unread count
+ */
+/**
+ * Get unread message counts for multiple matches
+ * 
+ * Efficiently calculates unread message counts for multiple matches in a single query.
+ * Returns a map of match IDs to their unread counts.
+ * 
+ * @param matchIds - Array of match IDs to get counts for
+ * @param userId - ID of the user
+ * @returns Promise resolving to object mapping match IDs to unread counts
+ * @throws {Error} If query fails
+ * 
+ * @example
+ * ```typescript
+ * const counts = await getUnreadCounts(['match-1', 'match-2'], 'user-id');
+ * console.log('Unread in match-1:', counts['match-1']);
+ * ```
  */
 export async function getUnreadCounts(
   matchIds: string[],
@@ -541,6 +732,26 @@ export async function getUnreadCounts(
  * Subscribe to typing indicators for a match
  * Uses Supabase broadcast channels for real-time typing events
  */
+/**
+ * Subscribe to typing indicators for a match
+ * 
+ * Sets up a real-time subscription to receive typing indicator events for a match.
+ * Returns an unsubscribe function to clean up the subscription.
+ * 
+ * @param matchId - ID of the match to subscribe to
+ * @param callback - Function to call when typing indicator is received
+ * @returns Unsubscribe function to stop receiving updates
+ * 
+ * @example
+ * ```typescript
+ * const unsubscribe = subscribeToTypingIndicators('match-id', (data) => {
+ *   console.log(`${data.userId} is typing`);
+ * });
+ * 
+ * // Later, to stop listening:
+ * unsubscribe();
+ * ```
+ */
 export function subscribeToTypingIndicators(
   matchId: string,
   callback: (userId: string, userName: string, isTyping: boolean) => void
@@ -565,6 +776,27 @@ export function subscribeToTypingIndicators(
 
 /**
  * Broadcast typing indicator event
+ */
+/**
+ * Broadcast a typing indicator for a user in a match
+ * 
+ * Sends a typing indicator event to notify other participants that a user is typing.
+ * The indicator automatically expires after a timeout if not refreshed.
+ * 
+ * @param matchId - ID of the match
+ * @param userId - ID of the user who is typing
+ * @param isTyping - Whether the user is currently typing (true) or stopped typing (false)
+ * @returns Promise that resolves when indicator is broadcast
+ * @throws {Error} If broadcast fails
+ * 
+ * @example
+ * ```typescript
+ * // User started typing
+ * await broadcastTypingIndicator('match-id', 'user-id', true);
+ * 
+ * // User stopped typing
+ * await broadcastTypingIndicator('match-id', 'user-id', false);
+ * ```
  */
 export async function broadcastTypingIndicator(
   matchId: string,

@@ -40,6 +40,7 @@ import { OptimizedImage } from "@/components/OptimizedImage";
 import { VirtualizedMessageList } from "@/components/VirtualizedMessageList";
 import { MessageBubble } from "@/components/MessageBubble";
 import { formatDate } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -142,7 +143,7 @@ const PrivateChat = () => {
       setRenameValue("");
       toast.success('Chat renamed successfully');
     } catch (error) {
-      console.error('Error renaming chat:', error);
+      logger.error('Error renaming chat', error);
       toast.error(
         error instanceof Error 
           ? error.message 
@@ -163,7 +164,7 @@ const PrivateChat = () => {
       await leaveConversationMutation.mutateAsync(conversationId);
       toast.success('Left conversation');
     } catch (error) {
-      console.error('Error leaving conversation:', error);
+      logger.error('Error leaving conversation', error);
       toast.error(error instanceof Error ? error.message : 'Failed to leave conversation');
     }
   };
@@ -318,7 +319,7 @@ const PrivateChat = () => {
         fileInputRef.current.value = '';
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      logger.error('Error sending message', error);
       toast.error(error instanceof Error ? error.message : 'Failed to send message');
     }
   };
@@ -359,7 +360,7 @@ const PrivateChat = () => {
       setEditingMessageId(null);
       setEditContent("");
     } catch (error) {
-      console.error('Error editing message:', error);
+      logger.error('Error editing message', error);
       toast.error('Failed to edit message');
     }
   };
@@ -380,7 +381,7 @@ const PrivateChat = () => {
         senderId: user.id,
       });
     } catch (error) {
-      console.error('Error deleting message:', error);
+      logger.error('Error deleting message', error);
       toast.error('Failed to delete message');
     }
   };

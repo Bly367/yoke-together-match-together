@@ -87,14 +87,43 @@ export function OptimizedImage({
     setHasError(false);
   };
 
-  // Generate optimized image URL (if using a CDN that supports transformations)
-  const getOptimizedUrl = (url: string): string => {
+  /**
+   * Generate optimized image URL with Supabase Storage transformations
+   * Supports width, quality, and format optimization
+   */
+  const getOptimizedUrl = (url: string, width?: number): string => {
     if (!url) return url;
     
-    // If using Supabase Storage, you can add transformations here
-    // Example: return `${url}?width=400&height=400&quality=${quality}`;
+    // Supabase Storage supports transformations via query parameters
+    if (url.includes('supabase.co/storage') || url.includes('supabase.storage')) {
+      const params = new URLSearchParams();
+      
+      // Add width if specified (Supabase auto-calculates height to maintain aspect ratio)
+      if (width) {
+        params.set('width', width.toString());
+      }
+      
+      // Add quality parameter
+      params.set('quality', quality.toString());
+      
+      // Add format (WebP if supported, fallback to original)
+      if (webp && supportsWebP) {
+        params.set('format', 'webp');
+      }
+      
+      // Preserve existing query parameters if any
+      const urlObj = new URL(url);
+      const existingParams = new URLSearchParams(urlObj.search);
+      existingParams.forEach((value, key) => {
+        if (!params.has(key)) {
+          params.set(key, value);
+        }
+      });
+      
+      return `${urlObj.pathname}?${params.toString()}`;
+    }
     
-    // For now, return original URL
+    // For non-Supabase URLs, return as-is (could integrate with other CDNs here)
     return url;
   };
 
@@ -106,9 +135,16 @@ export function OptimizedImage({
     );
   }
 
+  // Extract width from sizes prop if available (e.g., "400px" -> 400)
+  const extractWidth = (sizes?: string): number | undefined => {
+    if (!sizes) return undefined;
+    const match = sizes.match(/(\d+)px/);
+    return match ? parseInt(match[1], 10) : undefined;
+  };
+
   return (
     <img
-      src={getOptimizedUrl(imageSrc)}
+      src={getOptimizedUrl(imageSrc, extractWidth(sizes))}
       alt={alt}
       loading={lazy ? 'lazy' : 'eager'}
       decoding="async"

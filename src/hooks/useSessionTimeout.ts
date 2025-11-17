@@ -74,7 +74,7 @@ export function useSessionTimeout(
         }
       }
     } catch (error) {
-      console.error('Error checking session:', error);
+      logger.error('Error checking session', error);
     }
   }, [user, onSessionExpiring, onSessionExpired]);
 
@@ -92,7 +92,7 @@ export function useSessionTimeout(
       
       return session;
     } catch (error) {
-      console.error('Error refreshing session:', error);
+      logger.error('Error refreshing session', error);
       throw error;
     }
   }, [checkSession]);

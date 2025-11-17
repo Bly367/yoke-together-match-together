@@ -1,4 +1,4 @@
-import { Suspense, lazy } from "react";
+import React, { Suspense, lazy } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,12 +8,16 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SessionTimeoutWarning } from "@/components/SessionTimeoutWarning";
 import { RouteTransition } from "@/components/RouteTransition";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { FeatureErrorBoundary } from "@/components/FeatureErrorBoundary";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { ViewingProvider } from "@/contexts/ViewingContext";
 import { useDefaultKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useExpireDuoRequests } from "@/hooks/useExpireDuoRequests";
 import { ROUTES } from "@/lib/routes";
 import { Loader2 } from "lucide-react";
+import { initErrorTracking, trackWebVitals } from "@/lib/monitoring";
+import { logger } from "@/lib/logger";
+import { registerSW } from "virtual:pwa-register";
 
 // Lazy load pages for code splitting
 const Index = lazy(() => import("./pages/Index"));
@@ -44,7 +48,41 @@ const PageLoader = () => (
   </div>
 );
 
-const queryClient = new QueryClient();
+/**
+ * React Query client with optimized configuration for production
+ * 
+ * Configuration:
+ * - staleTime: 5 minutes - data considered fresh for 5 min (reduces refetches)
+ * - gcTime: 10 minutes - cache garbage collection time
+ * - Smart retry logic - retries network errors, not client errors (4xx)
+ * - Exponential backoff - prevents server overload
+ * - refetchOnWindowFocus: false - better UX, prevents unnecessary refetches
+ * - refetchOnReconnect: true - refetch when network reconnects
+ */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes - data fresh for 5 min
+      gcTime: 10 * 60 * 1000, // 10 minutes - cache garbage collection (formerly cacheTime)
+      retry: (failureCount, error: any) => {
+        // Don't retry on 4xx errors (client errors like validation, auth, etc.)
+        if (error?.status >= 400 && error?.status < 500) {
+          return false;
+        }
+        // Retry up to 3 times for network/server errors (5xx, network failures)
+        return failureCount < 3;
+      },
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff: 1s, 2s, 4s, max 30s
+      refetchOnWindowFocus: false, // Don't refetch on window focus (better UX, reduces API calls)
+      refetchOnReconnect: true, // Refetch when network reconnects (good for offline support)
+      refetchOnMount: true, // Refetch when component mounts (ensures fresh data)
+    },
+    mutations: {
+      retry: 1, // Retry mutations once on failure (network errors only)
+      retryDelay: 1000,
+    },
+  },
+});
 
 /**
  * App content component with route transitions and keyboard shortcuts
@@ -100,7 +138,9 @@ const AppContent = () => {
               path={ROUTES.MATCHMAKING}
               element={
                 <ProtectedRoute>
-                  <Matchmaking />
+                  <FeatureErrorBoundary featureName="Matchmaking">
+                    <Matchmaking />
+                  </FeatureErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -108,7 +148,9 @@ const AppContent = () => {
               path={ROUTES.MATCHES}
               element={
                 <ProtectedRoute>
-                  <Matches />
+                  <FeatureErrorBoundary featureName="Matches">
+                    <Matches />
+                  </FeatureErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -116,7 +158,9 @@ const AppContent = () => {
               path={ROUTES.MESSAGES}
               element={
                 <ProtectedRoute>
-                  <Messages />
+                  <FeatureErrorBoundary featureName="Messages">
+                    <Messages />
+                  </FeatureErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -124,7 +168,9 @@ const AppContent = () => {
               path={`${ROUTES.CHAT_BASE}/:matchId`}
               element={
                 <ProtectedRoute>
-                  <Chat />
+                  <FeatureErrorBoundary featureName="Chat">
+                    <Chat />
+                  </FeatureErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -132,7 +178,9 @@ const AppContent = () => {
               path={ROUTES.PRIVATE_MESSAGES}
               element={
                 <ProtectedRoute>
-                  <PrivateMessages />
+                  <FeatureErrorBoundary featureName="Private Messages">
+                    <PrivateMessages />
+                  </FeatureErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -140,7 +188,9 @@ const AppContent = () => {
               path={`${ROUTES.PRIVATE_CHAT_BASE}/:conversationId`}
               element={
                 <ProtectedRoute>
-                  <PrivateChat />
+                  <FeatureErrorBoundary featureName="Private Chat">
+                    <PrivateChat />
+                  </FeatureErrorBoundary>
                 </ProtectedRoute>
               }
             />
@@ -176,8 +226,32 @@ const AppContent = () => {
   );
 };
 
-const App = () => (
-  <ErrorBoundary>
+/**
+ * Main App component
+ * Initializes monitoring and error tracking on mount
+ */
+const App = () => {
+  // Initialize error tracking and performance monitoring
+  React.useEffect(() => {
+    initErrorTracking();
+    trackWebVitals();
+  }, []);
+
+  // Register service worker for PWA functionality
+  React.useEffect(() => {
+    registerSW({
+      immediate: true,
+      onRegistered(r: unknown) {
+        logger.info('Service Worker Registered', r);
+      },
+      onRegisterError(error: Error) {
+        logger.error('Service Worker registration error', error);
+      },
+    });
+  }, []);
+
+  return (
+    <ErrorBoundary>
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <ViewingProvider>
@@ -193,6 +267,7 @@ const App = () => (
       </QueryClientProvider>
     </ThemeProvider>
   </ErrorBoundary>
-);
+  );
+};
 
 export default App;

@@ -12,13 +12,21 @@ This document divides the Yoke project into distinct sections for multi-agent co
 
 **Files:**
 - `src/services/auth.service.ts`
+- `src/services/moderation.service.ts`
+- `src/services/rateLimit.service.ts`
 - `src/hooks/useAuth.ts`
+- `src/hooks/useSessionTimeout.ts`
 - `src/pages/Auth.tsx`
+- `src/pages/ForgotPassword.tsx`
+- `src/pages/ResetPassword.tsx`
 - `src/components/ProtectedRoute.tsx`
 - `src/components/SessionTimeoutWarning.tsx`
 
 **Review Checklist:**
 - [ ] Authentication flows work correctly
+- [ ] Password reset flow
+- [ ] Rate limiting
+- [ ] Moderation features
 - [ ] No security vulnerabilities
 - [ ] Proper error handling
 - [ ] Input validation
@@ -30,21 +38,30 @@ This document divides the Yoke project into distinct sections for multi-agent co
 ---
 
 ### 👤 Section 2: User Profiles & Onboarding
-**Review Focus:** Profile creation, updates, photo uploads, onboarding flows
+**Review Focus:** Profile creation, updates, photo uploads, onboarding flows, preferences
 
 **Files:**
 - `src/pages/ProfileSetup.tsx`
 - `src/pages/Profile.tsx`
 - `src/pages/Index.tsx`
+- `src/pages/Preferences.tsx`
+- `src/pages/NotificationSettings.tsx`
 - `src/components/PhotoUpload.tsx`
 - `src/components/ProfileCompleteness.tsx`
 - `src/components/OptimizedImage.tsx`
 - `src/services/storage.service.ts`
+- `src/services/preferences.service.ts`
 - `src/hooks/useStorage.ts`
+- `src/hooks/usePreferences.ts`
+- `src/lib/preferences.ts`
+- `src/lib/profileCompleteness.ts`
+- `src/lib/notifications.ts`
 
 **Review Checklist:**
 - [ ] Profile creation flow
 - [ ] Photo upload functionality
+- [ ] Preferences management
+- [ ] Notification settings
 - [ ] Form validation
 - [ ] Error handling
 - [ ] UI/UX quality
@@ -55,19 +72,23 @@ This document divides the Yoke project into distinct sections for multi-agent co
 ---
 
 ### 👥 Section 3: Duo Management
-**Review Focus:** Duo creation, friend lookup, duo operations, duo profiles
+**Review Focus:** Duo creation, friend lookup, duo operations, duo profiles, duo requests
 
 **Files:**
 - `src/services/duo.service.ts`
+- `src/services/duoRequest.service.ts`
 - `src/hooks/useDuos.ts`
+- `src/hooks/useDuoRequests.ts`
+- `src/hooks/useExpireDuoRequests.ts`
 - `src/pages/DuoSetup.tsx`
 - `src/pages/JoinDuo.tsx`
-- Related duo display components
+- `src/pages/DuoRequests.tsx`
 
 **Review Checklist:**
 - [ ] Duo creation flow
 - [ ] Friend lookup functionality
 - [ ] Duo update operations
+- [ ] Duo request system
 - [ ] Architecture compliance (no direct Supabase calls)
 - [ ] Error handling
 - [ ] Data validation
@@ -99,18 +120,25 @@ This document divides the Yoke project into distinct sections for multi-agent co
 ---
 
 ### 💬 Section 5: Chat & Messaging
-**Review Focus:** Message sending, real-time subscriptions, chat UI, message lists
+**Review Focus:** Message sending, real-time subscriptions, chat UI, message lists, private messaging
 
 **Files:**
 - `src/services/chat.service.ts`
+- `src/services/privateMessaging.service.ts`
 - `src/hooks/useChat.ts`
+- `src/hooks/usePrivateMessaging.ts`
 - `src/pages/Chat.tsx`
 - `src/pages/Messages.tsx`
+- `src/pages/PrivateChat.tsx`
+- `src/pages/PrivateMessages.tsx`
 - `src/components/VirtualizedMessageList.tsx`
+- `src/components/MessageBubble.tsx`
+- `src/components/PrivateConversationItem.tsx`
 
 **Review Checklist:**
 - [ ] Message sending/receiving
 - [ ] Real-time subscriptions
+- [ ] Private messaging functionality
 - [ ] Query key consistency
 - [ ] Pagination
 - [ ] Performance optimization
@@ -151,7 +179,9 @@ This document divides the Yoke project into distinct sections for multi-agent co
 - `src/components/NavLink.tsx`
 - `src/components/RouteTransition.tsx`
 - `src/pages/NotFound.tsx`
-- `src/pages/JoinDuo.tsx`
+- `src/pages/Auth.tsx`
+- `src/pages/ForgotPassword.tsx`
+- `src/pages/ResetPassword.tsx`
 - `src/hooks/useRoutePrefetch.ts`
 - `src/hooks/useKeyboardShortcuts.ts`
 
@@ -162,6 +192,7 @@ This document divides the Yoke project into distinct sections for multi-agent co
 - [ ] Route protection
 - [ ] Deep linking
 - [ ] 404 handling
+- [ ] Password reset flow routing
 
 **Review Document:** `REVIEW_SECTION_07_ROUTING.md`
 
@@ -171,10 +202,14 @@ This document divides the Yoke project into distinct sections for multi-agent co
 **Review Focus:** Reusable components, UI library usage, styling consistency
 
 **Files:**
-- `src/components/ui/*` (all shadcn/ui components)
+- `src/components/ui/*` (all shadcn/ui components - 48+ components)
 - `src/components/BatchOperations.tsx`
+- `src/components/ErrorBoundary.tsx`
+- `src/components/ThemeProvider.tsx`
+- `src/components/ThemeToggle.tsx`
 - `src/index.css`
 - `tailwind.config.ts`
+- `src/App.css`
 
 **Review Checklist:**
 - [ ] Component reusability
@@ -183,6 +218,7 @@ This document divides the Yoke project into distinct sections for multi-agent co
 - [ ] Responsive design
 - [ ] Component documentation
 - [ ] Theme consistency
+- [ ] Error boundary implementation
 
 **Review Document:** `REVIEW_SECTION_08_UI_COMPONENTS.md`
 
@@ -194,8 +230,9 @@ This document divides the Yoke project into distinct sections for multi-agent co
 **Files:**
 - `src/integrations/supabase/client.ts`
 - `src/integrations/supabase/types.ts`
-- `supabase/migrations/*`
-- `scripts/*.sql`
+- `supabase/migrations/*` (all migration files)
+- `scripts/*.sql` (all SQL scripts)
+- `supabase/config.toml`
 - Database-related documentation
 
 **Review Checklist:**
@@ -204,6 +241,7 @@ This document divides the Yoke project into distinct sections for multi-agent co
 - [ ] Database schema
 - [ ] RLS policies
 - [ ] Migration scripts
+- [ ] Function definitions
 - [ ] Error handling
 
 **Review Document:** `REVIEW_SECTION_09_DATABASE.md`
@@ -240,9 +278,12 @@ This document divides the Yoke project into distinct sections for multi-agent co
 **Review Focus:** Test coverage, test quality, quality assurance practices
 
 **Files:**
-- Test files (if any)
-- Test configuration
-- Quality check scripts
+- `src/services/__tests__/*` (all service tests)
+- `src/hooks/__tests__/*` (all hook tests)
+- `src/lib/__tests__/*` (all lib tests)
+- `src/test/setup.ts`
+- `vitest.config.ts`
+- Test configuration files
 
 **Review Checklist:**
 - [ ] Test coverage
@@ -250,6 +291,7 @@ This document divides the Yoke project into distinct sections for multi-agent co
 - [ ] Test configuration
 - [ ] CI/CD integration
 - [ ] Code quality tools
+- [ ] Mock data setup
 
 **Review Document:** `REVIEW_SECTION_11_TESTING.md`
 
@@ -354,7 +396,8 @@ See `REVIEW_TRACKING.md` for detailed tracking of all reviews, issues, and resol
 
 ---
 
-**Last Updated:** [Current Date]
+**Last Updated:** 2024-12-19
 **Project:** Yoke (Two-Man Dating App)
 **Total Sections:** 12
+**Total Files:** ~200+ files across all sections
 

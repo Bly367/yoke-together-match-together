@@ -126,7 +126,7 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
         toast.success('Photo removed');
       } catch (error: any) {
         // Log error but continue with removal (photo might already be deleted)
-        console.error('Failed to delete photo from storage:', error);
+        logger.error('Failed to delete photo from storage', error);
         toast.error(error.message || 'Failed to remove photo from storage');
         // Continue with removal anyway
       }

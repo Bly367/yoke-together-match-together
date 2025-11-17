@@ -1,5 +1,14 @@
 import { supabase } from '@/integrations/supabase/client';
-import { retryWithBackoff, isValidEmail } from '@/lib/utils';
+import { retryWithBackoff } from '@/lib/utils';
+import { logger } from '@/lib/logger';
+import { 
+  emailSchema, 
+  passwordSchema, 
+  nameSchema, 
+  ageSchema,
+  bioSchema
+} from '@/lib/validation';
+import { ValidationError, NotFoundError, AuthenticationError } from '@/lib/errors';
 import type { PostgrestError } from '@supabase/supabase-js';
 
 /**
@@ -51,43 +60,71 @@ function handleProfileError(error: PostgrestError, context: 'fetch' | 'create' |
 }
 
 /**
- * Validate email format
+ * Validate email format using Zod schema
  */
 function validateEmail(email: string): void {
-  if (!isValidEmail(email)) {
-    throw new Error('Invalid email format');
+  try {
+    emailSchema.parse(email);
+  } catch (error) {
+    throw new ValidationError(
+      error instanceof Error ? error.message : 'Invalid email format',
+      'email'
+    );
   }
 }
 
 /**
- * Validate password strength
+ * Validate password strength using Zod schema
  */
 function validatePassword(password: string): void {
-  if (!password || password.length < 8) {
-    throw new Error('Password must be at least 8 characters long');
-  }
-  if (password.length > 128) {
-    throw new Error('Password must be less than 128 characters');
+  try {
+    passwordSchema.parse(password);
+  } catch (error) {
+    throw new ValidationError(
+      error instanceof Error ? error.message : 'Invalid password format',
+      'password'
+    );
   }
 }
 
 /**
- * Validate name
+ * Validate name using Zod schema
  */
 function validateName(name: string): void {
-  if (!name || name.trim().length === 0) {
-    throw new Error('Name is required');
-  }
-  if (name.trim().length < 2) {
-    throw new Error('Name must be at least 2 characters long');
-  }
-  if (name.length > 100) {
-    throw new Error('Name must be less than 100 characters');
+  try {
+    nameSchema.parse(name);
+  } catch (error) {
+    throw new ValidationError(
+      error instanceof Error ? error.message : 'Invalid name format',
+      'name'
+    );
   }
 }
 
 /**
- * Sign up with email and password
+ * Sign up a new user with email and password
+ * 
+ * Creates a new user account and associated profile. Uses retry logic to handle
+ * potential race conditions with database triggers.
+ * 
+ * @param email - User's email address (must be valid email format)
+ * @param password - User's password (must meet strength requirements: min 8 chars, uppercase, lowercase, number, special char)
+ * @param name - User's display name (1-100 characters)
+ * @returns Promise resolving to the created user profile
+ * @throws {ValidationError} If email, password, or name validation fails
+ * @throws {Error} If user creation fails or profile cannot be created after retries
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   const profile = await signUp('user@example.com', 'SecurePass123!', 'John Doe');
+ *   console.log('User created:', profile.id);
+ * } catch (error) {
+ *   if (error instanceof ValidationError) {
+ *     console.error('Validation failed:', error.message);
+ *   }
+ * }
+ * ```
  */
 export async function signUp(email: string, password: string, name: string): Promise<UserProfile> {
   // Validate inputs
@@ -131,7 +168,7 @@ export async function signUp(email: string, password: string, name: string): Pro
             .single();
           
           if (updateError) {
-            console.error('Profile update error:', updateError);
+            logger.error('Profile update error', updateError, { userId: existingProfile.id });
             // Profile exists, return it even if update failed
             return existingProfile;
           }
@@ -163,7 +200,7 @@ export async function signUp(email: string, password: string, name: string): Pro
       return newProfile;
     }, 5, 100); // 5 attempts, starting with 100ms delay
   } catch (error) {
-    console.error('Profile creation/retrieval failed after retries:', error);
+    logger.error('Profile creation/retrieval failed after retries', error, { userId: data.user.id });
     throw error;
   }
 
@@ -171,13 +208,32 @@ export async function signUp(email: string, password: string, name: string): Pro
 }
 
 /**
- * Sign in with email and password
+ * Sign in an existing user with email and password
+ * 
+ * Authenticates the user and returns their profile. Creates a profile if one doesn't exist
+ * (for backward compatibility with older accounts).
+ * 
+ * @param email - User's email address
+ * @param password - User's password
+ * @returns Promise resolving to the user's profile
+ * @throws {ValidationError} If email is invalid or password is empty
+ * @throws {Error} If authentication fails or profile cannot be retrieved/created
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   const profile = await signIn('user@example.com', 'password123');
+ *   console.log('Signed in:', profile.name);
+ * } catch (error) {
+ *   console.error('Sign in failed:', error.message);
+ * }
+ * ```
  */
 export async function signIn(email: string, password: string): Promise<UserProfile> {
   // Validate inputs
   validateEmail(email);
   if (!password || password.length === 0) {
-    throw new Error('Password is required');
+    throw new ValidationError('Password is required', 'password');
   }
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -221,7 +277,18 @@ export async function signIn(email: string, password: string): Promise<UserProfi
 }
 
 /**
- * Sign out current user
+ * Sign out the current authenticated user
+ * 
+ * Clears the user's session and authentication tokens.
+ * 
+ * @returns Promise that resolves when sign out is complete
+ * @throws {Error} If sign out fails
+ * 
+ * @example
+ * ```typescript
+ * await signOut();
+ * // User is now signed out
+ * ```
  */
 export async function signOut(): Promise<void> {
   const { error } = await supabase.auth.signOut();
@@ -230,6 +297,11 @@ export async function signOut(): Promise<void> {
 
 /**
  * Get current user profile
+ */
+/**
+ * Get current user profile
+ * @returns User profile or null if not authenticated
+ * @throws {NotFoundError} If profile doesn't exist and can't be created
  */
 export async function getCurrentUser(): Promise<UserProfile | null> {
   const { data: { user } } = await supabase.auth.getUser();
@@ -258,21 +330,25 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
 function validateProfileUpdate(profile: Partial<UserProfile>): void {
   // Validate age if provided
   if (profile.age !== undefined) {
-    if (typeof profile.age !== 'number' || isNaN(profile.age)) {
-      throw new Error('Age must be a valid number');
-    }
-    if (profile.age < 18 || profile.age > 120) {
-      throw new Error('Age must be between 18 and 120');
+    try {
+      ageSchema.parse(profile.age);
+    } catch (error) {
+      throw new ValidationError(
+        error instanceof Error ? error.message : 'Invalid age',
+        'age'
+      );
     }
   }
 
   // Validate bio length if provided
-  if (profile.bio !== undefined) {
-    if (typeof profile.bio !== 'string') {
-      throw new Error('Bio must be a string');
-    }
-    if (profile.bio.length > 500) {
-      throw new Error('Bio must be less than 500 characters');
+  if (profile.bio !== undefined && profile.bio !== null) {
+    try {
+      bioSchema.parse(profile.bio);
+    } catch (error) {
+      throw new ValidationError(
+        error instanceof Error ? error.message : 'Invalid bio',
+        'bio'
+      );
     }
   }
 
@@ -306,9 +382,16 @@ function validateProfileUpdate(profile: Partial<UserProfile>): void {
 /**
  * Update user profile
  */
+/**
+ * Update user profile
+ * @param profile - Partial profile data to update
+ * @returns Updated user profile
+ * @throws {AuthenticationError} If user is not authenticated
+ * @throws {ValidationError} If profile data is invalid
+ */
 export async function updateProfile(profile: Partial<UserProfile>): Promise<UserProfile> {
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('Not authenticated');
+  if (!user) throw new AuthenticationError('Not authenticated');
 
   // Validate profile update fields
   validateProfileUpdate(profile);
@@ -328,7 +411,24 @@ export async function updateProfile(profile: Partial<UserProfile>): Promise<User
 }
 
 /**
- * Find profile by email
+ * Find a user profile by email address
+ * 
+ * Useful for looking up users by email (e.g., for invitations, friend requests).
+ * Returns null if no profile is found (does not throw an error).
+ * 
+ * @param email - Email address to search for
+ * @returns Promise resolving to profile with id, name, and email, or null if not found
+ * @throws {ValidationError} If email format is invalid
+ * 
+ * @example
+ * ```typescript
+ * const profile = await findProfileByEmail('friend@example.com');
+ * if (profile) {
+ *   console.log('Found user:', profile.name);
+ * } else {
+ *   console.log('User not found');
+ * }
+ * ```
  */
 export async function findProfileByEmail(email: string): Promise<Pick<UserProfile, 'id' | 'name' | 'email'> | null> {
   // Validate email
@@ -349,9 +449,26 @@ export async function findProfileByEmail(email: string): Promise<Pick<UserProfil
 }
 
 /**
- * Send password reset email
+ * Send password reset email to user
+ * 
+ * Sends an email with a password reset link. The link will redirect to the reset password
+ * page (or custom redirect URL if provided) where the user can set a new password.
+ * 
  * @param email - User's email address
- * @param redirectTo - Optional redirect URL after password reset (defaults to reset password page)
+ * @param redirectTo - Optional custom redirect URL after password reset (defaults to /reset-password)
+ * @returns Promise that resolves when email is sent
+ * @throws {ValidationError} If email format is invalid
+ * @throws {Error} If email sending fails
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   await resetPassword('user@example.com');
+ *   toast.success('Password reset email sent!');
+ * } catch (error) {
+ *   toast.error('Failed to send reset email');
+ * }
+ * ```
  */
 export async function resetPassword(email: string, redirectTo?: string): Promise<void> {
   // Validate email
@@ -369,8 +486,25 @@ export async function resetPassword(email: string, redirectTo?: string): Promise
 }
 
 /**
- * Update password with reset token
- * @param newPassword - New password to set
+ * Update user's password with reset token
+ * 
+ * Updates the password for the currently authenticated user. Requires a valid session
+ * (typically obtained from the password reset link).
+ * 
+ * @param newPassword - New password to set (must meet strength requirements)
+ * @returns Promise that resolves when password is updated
+ * @throws {ValidationError} If password doesn't meet strength requirements
+ * @throws {Error} If password update fails (e.g., invalid session, expired token)
+ * 
+ * @example
+ * ```typescript
+ * try {
+ *   await updatePassword('NewSecurePass123!');
+ *   toast.success('Password updated successfully!');
+ * } catch (error) {
+ *   toast.error('Failed to update password');
+ * }
+ * ```
  */
 export async function updatePassword(newPassword: string): Promise<void> {
   // Validate password

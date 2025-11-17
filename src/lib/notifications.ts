@@ -2,12 +2,14 @@
  * Browser notification utilities
  */
 
+import { logger } from './logger';
+
 /**
  * Request browser notification permission
  */
 export async function requestNotificationPermission(): Promise<boolean> {
   if (!('Notification' in window)) {
-    console.warn('This browser does not support notifications');
+    logger.warn('This browser does not support notifications');
     return false;
   }
 
@@ -56,7 +58,7 @@ export function showNotification(
       ...options,
     });
   } catch (error) {
-    console.error('Failed to show notification:', error);
+    logger.error('Failed to show notification', error);
     return null;
   }
 }
