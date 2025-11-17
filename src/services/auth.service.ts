@@ -334,11 +334,17 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       .from('profiles')
       .select()
       .eq('id', user.id)
-      .single();
+      .maybeSingle();
 
     if (error) {
       // If profile doesn't exist, return null (user needs to complete profile setup)
       if (error.code === 'PGRST116') {
+        return null;
+      }
+      
+      // Handle 406 (Not Acceptable) - might be RLS or content negotiation issue
+      if (error.status === 406) {
+        logger.warn('Profile query returned 406, might be RLS issue', error);
         return null;
       }
       
