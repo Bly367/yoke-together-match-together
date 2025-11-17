@@ -1,6 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
-import { trackMessageSent } from './preferenceEvents.service.js';
 
 /**
  * Message type
@@ -279,8 +278,14 @@ export async function sendMessage(
 
   // Track message_sent preference event (async, don't block)
   // Use setTimeout to avoid blocking message send
+  // Dynamic import to avoid build issues - gracefully handles if module can't be loaded
   setTimeout(async () => {
     try {
+      // Dynamically import to avoid build resolution issues
+      // Use @ alias which Vite resolves correctly in dynamic imports
+      const preferenceEventsModule = await import('@/services/preferenceEvents.service');
+      const { trackMessageSent } = preferenceEventsModule;
+      
       // Find which duo the sender belongs to
       const { data: senderDuo } = await supabase
         .from('duos')
@@ -289,14 +294,14 @@ export async function sendMessage(
         .eq('is_active', true)
         .maybeSingle();
       
-      if (senderDuo) {
+      if (senderDuo && trackMessageSent) {
         // Track message sent event (fire and forget)
         trackMessageSent(actualSenderId, senderDuo.id).catch((err) => {
           logger.warn('Failed to track message_sent event', { error: err });
         });
       }
     } catch (err) {
-      // Don't fail message send if tracking fails
+      // Don't fail message send if tracking fails or module can't be loaded
       logger.warn('Failed to track message_sent event', { error: err });
     }
   }, 0);

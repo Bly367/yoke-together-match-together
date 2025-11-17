@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { updateEloAfterMatch } from './elo.service';
 import type { DuoWithMembers } from './duo.service';
 
 /**
@@ -391,7 +392,65 @@ export async function checkMatch(
       .maybeSingle();
 
     if (error && error.code !== 'PGRST116') throw error;
-    if (match) return match as Match;
+    if (match) {
+      // Update ELO scores for all users in both duos (non-blocking)
+      // This runs asynchronously and doesn't block the match check
+      const updateEloScores = async () => {
+        try {
+          const { logger } = await import('@/lib/logger');
+          const matchData = match as Match;
+          if (matchData.duo1 && matchData.duo2) {
+            // Update ELO for all 4 users (duo1 members vs duo2 members)
+            const { updateEloAfterMatch } = await import('./elo.service');
+            
+            // Run all ELO updates in parallel for better performance
+            await Promise.allSettled([
+              updateEloAfterMatch(
+                matchData.duo1.member1.id,
+                matchData.duo2.member1.id,
+                'match'
+              ),
+              updateEloAfterMatch(
+                matchData.duo1.member1.id,
+                matchData.duo2.member2.id,
+                'match'
+              ),
+              updateEloAfterMatch(
+                matchData.duo1.member2.id,
+                matchData.duo2.member1.id,
+                'match'
+              ),
+              updateEloAfterMatch(
+                matchData.duo1.member2.id,
+                matchData.duo2.member2.id,
+                'match'
+              ),
+            ]).then((results) => {
+              // Log any failures but don't throw
+              results.forEach((result, index) => {
+                if (result.status === 'rejected') {
+                  logger.error('Failed to update ELO after match', {
+                    error: result.reason,
+                    index,
+                  });
+                }
+              });
+            });
+          }
+        } catch (error) {
+          // Don't fail match check if ELO update fails
+          const { logger } = await import('@/lib/logger');
+          logger.error('Error updating ELO after match', error);
+        }
+      };
+      
+      // Fire and forget - don't await to avoid blocking match check
+      updateEloScores().catch(() => {
+        // Silently handle any errors
+      });
+      
+      return match as Match;
+    }
 
     // If no match found and not the last attempt, wait before retrying
     if (attempt < maxRetries - 1) {

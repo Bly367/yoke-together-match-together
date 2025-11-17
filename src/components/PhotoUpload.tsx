@@ -1,20 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Camera, Loader2, X, ZoomIn, RotateCw } from 'lucide-react';
+import { Camera, Loader2, X, Edit2 } from 'lucide-react';
 import { useUploadPhoto, useDeletePhoto } from '@/hooks/useStorage';
 import { toast } from 'sonner';
-import Cropper from 'react-easy-crop';
-import { createCroppedImage } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
-} from '@/components/ui/dialog';
-import { Slider } from '@/components/ui/slider';
+import { PhotoEditor } from '@/components/PhotoEditor';
 
 interface PhotoUploadProps {
   currentPhotoUrl?: string;
@@ -23,23 +13,13 @@ interface PhotoUploadProps {
   className?: string;
 }
 
-interface CropArea {
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
-
 /**
  * Reusable photo upload component with cropping functionality
+ * Similar to Hinge/text messaging - tap to edit, easy adjustments
  */
 export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, className = '' }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string | null>(currentPhotoUrl || null);
-  const [imageToCrop, setImageToCrop] = useState<string | null>(null);
-  const [crop, setCrop] = useState({ x: 0, y: 0 });
-  const [zoom, setZoom] = useState(1);
-  const [rotation, setRotation] = useState(0);
-  const [croppedAreaPixels, setCroppedAreaPixels] = useState<CropArea | null>(null);
+  const [imageToEdit, setImageToEdit] = useState<string | File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const uploadPhotoMutation = useUploadPhoto();
   const deletePhotoMutation = useDeletePhoto();
@@ -65,70 +45,37 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
       return;
     }
 
-    // Create preview and open crop dialog
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setImageToCrop(reader.result as string);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setRotation(0);
-    };
-    reader.readAsDataURL(file);
+    // Open editor for new photo
+    setImageToEdit(file);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
   };
 
-  const onCropComplete = (_croppedArea: CropArea, croppedAreaPixels: CropArea) => {
-    setCroppedAreaPixels(croppedAreaPixels);
-  };
-
-  const handleCropAndUpload = async () => {
-    if (!imageToCrop || !croppedAreaPixels) return;
-
+  const handleSavePhoto = async (file: File) => {
     try {
-      // Create cropped blob
-      const croppedBlob = await createCroppedImage(
-        imageToCrop,
-        croppedAreaPixels,
-        rotation
-      );
-
-      // Convert blob to file
-      const croppedFile = new File([croppedBlob], 'cropped-image.jpg', {
-        type: 'image/jpeg',
-      });
-
-      // Upload cropped photo
-      const url = await uploadPhotoMutation.mutateAsync({ file: croppedFile, userId });
+      // Upload edited photo
+      const url = await uploadPhotoMutation.mutateAsync({ file, userId });
       
       // Validate URL was returned
       if (!url || !url.trim()) {
         throw new Error('Upload succeeded but no URL was returned');
       }
 
-      // Update preview and close dialog
+      // Update preview and close editor
       setPreview(url.trim());
-      setImageToCrop(null);
+      setImageToEdit(null);
       onPhotoUploaded(url.trim());
       toast.success('Photo uploaded successfully');
     } catch (error: any) {
       logger.error('Failed to upload photo', error);
       toast.error(error.message || 'Failed to upload photo');
-      // Reset state on error
-      setImageToCrop(null);
-      setCrop({ x: 0, y: 0 });
-      setZoom(1);
-      setRotation(0);
-      setCroppedAreaPixels(null);
     }
   };
 
-  const handleCancelCrop = () => {
-    setImageToCrop(null);
-    setCrop({ x: 0, y: 0 });
-    setZoom(1);
-    setRotation(0);
-    setCroppedAreaPixels(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
+  const handleEditExisting = () => {
+    if (preview) {
+      setImageToEdit(preview);
     }
   };
 
@@ -156,15 +103,23 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
   return (
     <>
       <div className={`relative ${className}`}>
-        <div className="relative w-32 h-32 rounded-full bg-secondary/50 flex items-center justify-center border-4 border-primary/20 shadow-lg overflow-hidden cursor-pointer"
-          onClick={() => fileInputRef.current?.click()}>
+        <div className="relative w-32 h-32 rounded-full bg-secondary/50 flex items-center justify-center border-4 border-primary/20 shadow-lg overflow-hidden">
           {preview ? (
             <>
-              <img
-                src={preview}
-                alt="Profile"
-                className="w-full h-full object-cover"
-              />
+              <div
+                className="w-full h-full cursor-pointer group relative"
+                onClick={handleEditExisting}
+              >
+                <img
+                  src={preview}
+                  alt="Profile"
+                  className="w-full h-full object-cover"
+                />
+                {/* Edit overlay - appears on hover */}
+                <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-full">
+                  <Edit2 className="w-6 h-6 text-white" />
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={async (e) => {
@@ -182,7 +137,12 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
               </button>
             </>
           ) : (
-            <Camera className="w-12 h-12 text-primary" />
+            <div
+              className="w-full h-full cursor-pointer flex items-center justify-center"
+              onClick={() => fileInputRef.current?.click()}
+            >
+              <Camera className="w-12 h-12 text-primary" />
+            </div>
           )}
         </div>
         <input
@@ -209,107 +169,16 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
         </Button>
       </div>
 
-      {/* Crop Dialog */}
-      <Dialog open={!!imageToCrop} onOpenChange={(open) => !open && handleCancelCrop()}>
-        <DialogContent className="max-w-2xl data-[state=open]:zoom-in-100 data-[state=closed]:zoom-out-100">
-          <DialogHeader>
-            <DialogTitle>Crop Your Photo</DialogTitle>
-            <DialogDescription>
-              Adjust the zoom and rotation, then crop your photo to the desired size.
-            </DialogDescription>
-          </DialogHeader>
-          
-          <div className="relative w-full h-[400px] bg-secondary/20 rounded-lg overflow-hidden">
-            {imageToCrop && (
-              <Cropper
-                image={imageToCrop}
-                crop={crop}
-                zoom={zoom}
-                rotation={rotation}
-                aspect={1}
-                onCropChange={setCrop}
-                onZoomChange={setZoom}
-                onRotationChange={setRotation}
-                onCropComplete={onCropComplete}
-                cropShape="round"
-                showGrid={false}
-                style={{
-                  containerStyle: {
-                    width: '100%',
-                    height: '100%',
-                    position: 'relative',
-                  },
-                }}
-              />
-            )}
-          </div>
-
-          {/* Controls */}
-          <div className="space-y-4">
-            {/* Zoom Control */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <ZoomIn className="w-4 h-4" />
-                  <span>Zoom</span>
-                </div>
-                <span className="text-muted-foreground">{Math.round(zoom * 100)}%</span>
-              </div>
-              <Slider
-                value={[zoom]}
-                onValueChange={(value) => setZoom(value[0])}
-                min={1}
-                max={3}
-                step={0.1}
-                className="w-full"
-              />
-            </div>
-
-            {/* Rotation Control */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-2">
-                  <RotateCw className="w-4 h-4" />
-                  <span>Rotation</span>
-                </div>
-                <span className="text-muted-foreground">{rotation}°</span>
-              </div>
-              <Slider
-                value={[rotation]}
-                onValueChange={(value) => setRotation(value[0])}
-                min={0}
-                max={360}
-                step={1}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          <DialogFooter className="gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={handleCancelCrop}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="button"
-              onClick={handleCropAndUpload}
-              disabled={uploadPhotoMutation.isPending || !croppedAreaPixels}
-            >
-              {uploadPhotoMutation.isPending ? (
-                <>
-                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  Uploading...
-                </>
-              ) : (
-                'Save Photo'
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Photo Editor */}
+      <PhotoEditor
+        imageSrc={imageToEdit}
+        open={!!imageToEdit}
+        onClose={() => setImageToEdit(null)}
+        onSave={handleSavePhoto}
+        aspect={1}
+        showRotation={true}
+        cropShape="round"
+      />
     </>
   );
 }
