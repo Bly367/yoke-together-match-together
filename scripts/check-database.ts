@@ -4,8 +4,18 @@
  */
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.VITE_SUPABASE_URL || 'https://vprznvvhsembpvbyhnvk.supabase.co';
-const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZwcnpudnZoc2VtYnB2YnlobnZrIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI5MTU3MTYsImV4cCI6MjA3ODQ5MTcxNn0.v88yyC6Z_8TkxCerm5d4ZGe5d6JzRxG-ZigiVt5Ryv8';
+// SECURITY: Never hardcode credentials. Always use environment variables.
+const SUPABASE_URL = process.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ Missing required environment variables:');
+  console.error('   VITE_SUPABASE_URL');
+  console.error('   VITE_SUPABASE_PUBLISHABLE_KEY');
+  console.error('\nPlease set these in your .env file or environment.');
+  console.error('See SETUP_INSTRUCTIONS.md for details.');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
