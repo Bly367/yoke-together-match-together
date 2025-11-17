@@ -244,14 +244,20 @@ const AppContent = () => {
  * Initializes monitoring and error tracking on mount
  */
 const App = () => {
+  console.log('🔧 App component rendering...');
+  console.log('Supabase configured:', isSupabaseConfigured());
+  
   // Check if Supabase is configured - show error screen if not
   if (!isSupabaseConfigured()) {
+    console.warn('⚠️ Supabase not configured, showing ConfigError');
     return (
       <ErrorBoundary>
         <ConfigError />
       </ErrorBoundary>
     );
   }
+  
+  console.log('✅ Supabase configured, proceeding with app...');
 
   // Initialize error tracking and performance monitoring
   React.useEffect(() => {
@@ -260,6 +266,13 @@ const App = () => {
     
     // Add global error handlers to catch unhandled errors
     const handleError = (event: ErrorEvent) => {
+      console.error('❌ Unhandled error:', {
+        message: event.message,
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno,
+        error: event.error
+      });
       logger.error('Unhandled error', event.error, { 
         message: event.message, 
         filename: event.filename,
@@ -269,6 +282,7 @@ const App = () => {
     };
     
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      console.error('❌ Unhandled promise rejection:', event.reason);
       logger.error('Unhandled promise rejection', event.reason, {
         type: typeof event.reason,
       });
