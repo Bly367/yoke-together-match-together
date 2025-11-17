@@ -287,18 +287,22 @@ const Matches = () => {
                   <div className="relative flex-shrink-0">
                     <div className="w-14 h-14 rounded-full bg-primary/20 flex items-center justify-center shadow-md overflow-hidden">
                       <OptimizedImage
-                        src={otherDuo.member1?.photo_url}
+                        key={`${match.id}-member1-${otherDuo.member1?.id || 'unknown'}-${otherDuo.member1?.photo_url || 'no-photo'}`}
+                        src={otherDuo.member1?.photo_url || undefined}
                         alt={otherDuo.member1?.name || 'Member 1'}
                         className="w-full h-full"
                         fallbackIcon={<User className="w-8 h-8 text-primary" />}
+                        lazy={false}
                       />
                     </div>
                     <div className="w-14 h-14 rounded-full bg-secondary/30 flex items-center justify-center absolute -right-4 top-0 shadow-md border-2 border-card overflow-hidden">
                       <OptimizedImage
-                        src={otherDuo.member2?.photo_url}
+                        key={`${match.id}-member2-${otherDuo.member2?.id || 'unknown'}-${otherDuo.member2?.photo_url || 'no-photo'}`}
+                        src={otherDuo.member2?.photo_url || undefined}
                         alt={otherDuo.member2?.name || 'Member 2'}
                         className="w-full h-full"
                         fallbackIcon={<User className="w-8 h-8 text-primary" />}
+                        lazy={false}
                       />
                     </div>
                   </div>

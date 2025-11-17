@@ -92,10 +92,12 @@ const Profile = () => {
           <div className="bg-card rounded-3xl p-8 shadow-[var(--shadow-card)] text-center space-y-4 animate-slide-up">
             <div className="w-32 h-32 rounded-full bg-primary/20 mx-auto flex items-center justify-center shadow-lg overflow-hidden">
               <OptimizedImage
-                src={user.photo_url}
+                key={user.photo_url || `user-${user.id}-no-photo`}
+                src={user.photo_url || undefined}
                 alt={user.name}
                 className="w-32 h-32 rounded-full"
                 fallbackIcon={<User className="w-20 h-20 text-primary" />}
+                lazy={false}
               />
             </div>
             <div>
@@ -180,18 +182,22 @@ const Profile = () => {
                       <div className="relative">
                         <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center shadow-md overflow-hidden">
                           <OptimizedImage
-                            src={duo.member1?.photo_url}
+                            key={`${duo.id}-member1-${duo.member1?.id || 'unknown'}-${duo.member1?.photo_url || 'no-photo'}`}
+                            src={duo.member1?.photo_url || undefined}
                             alt={duo.member1?.name || 'Member 1'}
                             className="w-full h-full"
                             fallbackIcon={<User className="w-10 h-10 text-primary" />}
+                            lazy={false}
                           />
                         </div>
                         <div className="w-16 h-16 rounded-full bg-secondary/30 flex items-center justify-center absolute -right-4 top-0 shadow-md border-4 border-card overflow-hidden">
                           <OptimizedImage
-                            src={duo.member2?.photo_url}
+                            key={`${duo.id}-member2-${duo.member2?.id || 'unknown'}-${duo.member2?.photo_url || 'no-photo'}`}
+                            src={duo.member2?.photo_url || undefined}
                             alt={duo.member2?.name || 'Member 2'}
                             className="w-full h-full"
                             fallbackIcon={<User className="w-10 h-10 text-primary" />}
+                            lazy={false}
                           />
                         </div>
                       </div>

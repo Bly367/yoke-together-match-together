@@ -64,6 +64,22 @@ export const ROUTES = {
     }
     return `/private-chat/${conversationId}`;
   },
+  /**
+   * Base path for game session routes
+   */
+  GAME_SESSION_BASE: "/game",
+  /**
+   * Generate game session route with match ID and session ID
+   */
+  GAME_SESSION: (matchId: string, sessionId: string) => {
+    if (!matchId || typeof matchId !== 'string') {
+      throw new Error('matchId must be a non-empty string');
+    }
+    if (!sessionId || typeof sessionId !== 'string') {
+      throw new Error('sessionId must be a non-empty string');
+    }
+    return `/match/${matchId}/game/${sessionId}`;
+  },
 } as const;
 
 /**

@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send, User, Loader2, Paperclip, X as XIcon, File, Edit2, LogOut, MoreVertical } from "lucide-react";
+import { ArrowLeft, Send, User, Loader2, Paperclip, X as XIcon, File, Edit2, LogOut, MoreVertical, Gamepad2 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -41,6 +41,7 @@ import { MessageBubble } from "@/components/MessageBubble";
 import { formatDate } from "@/lib/utils";
 import { useViewing } from "@/contexts/ViewingContext";
 import { logger } from "@/lib/logger";
+import { GamesDialog } from "@/components/games/GamesDialog";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -94,6 +95,9 @@ const ChatComponent = () => {
   // Rename dialog state
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [renameValue, setRenameValue] = useState("");
+  
+  // Games dialog state
+  const [isGamesDialogOpen, setIsGamesDialogOpen] = useState(false);
 
   // Subscribe to new messages
   useMessageSubscription(matchId || null, true);
@@ -614,6 +618,10 @@ const ChatComponent = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setIsGamesDialogOpen(true)}>
+                        <Gamepad2 className="w-4 h-4 mr-2" />
+                        Games
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={handleOpenRenameDialog}>
                         <Edit2 className="w-4 h-4 mr-2" />
                         Rename Chat
@@ -724,6 +732,15 @@ const ChatComponent = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Games Dialog */}
+      {matchId && (
+        <GamesDialog
+          matchId={matchId}
+          open={isGamesDialogOpen}
+          onOpenChange={setIsGamesDialogOpen}
+        />
+      )}
 
       {/* Messages */}
       <div 

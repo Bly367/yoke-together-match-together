@@ -5,6 +5,7 @@ import { useUploadPhoto, useDeletePhoto } from '@/hooks/useStorage';
 import { toast } from 'sonner';
 import Cropper from 'react-easy-crop';
 import { createCroppedImage } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 import {
   Dialog,
   DialogContent,
@@ -97,13 +98,25 @@ export function PhotoUpload({ currentPhotoUrl, onPhotoUploaded, userId, classNam
       // Upload cropped photo
       const url = await uploadPhotoMutation.mutateAsync({ file: croppedFile, userId });
       
+      // Validate URL was returned
+      if (!url || !url.trim()) {
+        throw new Error('Upload succeeded but no URL was returned');
+      }
+
       // Update preview and close dialog
-      setPreview(url);
+      setPreview(url.trim());
       setImageToCrop(null);
-      onPhotoUploaded(url);
+      onPhotoUploaded(url.trim());
       toast.success('Photo uploaded successfully');
     } catch (error: any) {
+      logger.error('Failed to upload photo', error);
       toast.error(error.message || 'Failed to upload photo');
+      // Reset state on error
+      setImageToCrop(null);
+      setCrop({ x: 0, y: 0 });
+      setZoom(1);
+      setRotation(0);
+      setCroppedAreaPixels(null);
     }
   };
 

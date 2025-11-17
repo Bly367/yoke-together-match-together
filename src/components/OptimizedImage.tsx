@@ -65,10 +65,14 @@ export function OptimizedImage({
 
   // Update image source when src prop changes
   useEffect(() => {
-    if (src) {
-      setImageSrc(src);
+    const trimmedSrc = src?.trim() || null;
+    
+    if (trimmedSrc && trimmedSrc.length > 0) {
+      // Reset error state when new src is provided
       setHasError(false);
       setIsLoading(true);
+      // Always update to the new src (React will handle re-renders efficiently)
+      setImageSrc(trimmedSrc);
     } else {
       setImageSrc(null);
       setHasError(true);
@@ -77,9 +81,17 @@ export function OptimizedImage({
   }, [src]);
 
   const handleError = () => {
-    setHasError(true);
-    setIsLoading(false);
-    setImageSrc(null);
+    // Only set error if we actually have a source URL
+    // This prevents false errors when src is intentionally null/empty
+    if (imageSrc) {
+      setHasError(true);
+      setIsLoading(false);
+      // Don't clear imageSrc immediately - allow retry
+      // setImageSrc(null);
+    } else {
+      setHasError(true);
+      setIsLoading(false);
+    }
   };
 
   const handleLoad = () => {
@@ -88,46 +100,37 @@ export function OptimizedImage({
   };
 
   /**
-   * Generate optimized image URL with Supabase Storage transformations
-   * Supports width, quality, and format optimization
+   * Validate and return image URL
+   * Supabase Storage URLs are used as-is (no server-side transformations supported)
+   * This function ensures URLs are valid and properly formatted
    */
-  const getOptimizedUrl = (url: string, width?: number): string => {
-    if (!url) return url;
+  const getValidatedUrl = (url: string): string => {
+    if (!url || !url.trim()) return url;
     
-    // Supabase Storage supports transformations via query parameters
-    if (url.includes('supabase.co/storage') || url.includes('supabase.storage')) {
-      const params = new URLSearchParams();
-      
-      // Add width if specified (Supabase auto-calculates height to maintain aspect ratio)
-      if (width) {
-        params.set('width', width.toString());
+    const trimmedUrl = url.trim();
+    
+    // Validate URL format
+    try {
+      const urlObj = new URL(trimmedUrl);
+      // Return the full URL as-is - Supabase Storage doesn't support query param transformations
+      return urlObj.href;
+    } catch (error) {
+      // If URL parsing fails, it might be a relative path or malformed URL
+      // Try to fix common issues
+      if (trimmedUrl.startsWith('/')) {
+        // Relative path - might be valid in some contexts, but log warning
+        console.warn('Relative URL detected in OptimizedImage:', trimmedUrl);
+        return trimmedUrl;
       }
       
-      // Add quality parameter
-      params.set('quality', quality.toString());
-      
-      // Add format (WebP if supported, fallback to original)
-      if (webp && supportsWebP) {
-        params.set('format', 'webp');
-      }
-      
-      // Preserve existing query parameters if any
-      const urlObj = new URL(url);
-      const existingParams = new URLSearchParams(urlObj.search);
-      existingParams.forEach((value, key) => {
-        if (!params.has(key)) {
-          params.set(key, value);
-        }
-      });
-      
-      return `${urlObj.pathname}?${params.toString()}`;
+      // Invalid URL - log error but return as-is to let browser handle it
+      console.error('Invalid URL in OptimizedImage:', trimmedUrl, error);
+      return trimmedUrl;
     }
-    
-    // For non-Supabase URLs, return as-is (could integrate with other CDNs here)
-    return url;
   };
 
-  if (hasError || !imageSrc) {
+  // Only render fallback if we have no source
+  if (!imageSrc) {
     return (
       <div className={cn('flex items-center justify-center bg-secondary/20', className)}>
         {fallbackIcon || <User className="w-1/2 h-1/2 text-muted-foreground" />}
@@ -135,16 +138,12 @@ export function OptimizedImage({
     );
   }
 
-  // Extract width from sizes prop if available (e.g., "400px" -> 400)
-  const extractWidth = (sizes?: string): number | undefined => {
-    if (!sizes) return undefined;
-    const match = sizes.match(/(\d+)px/);
-    return match ? parseInt(match[1], 10) : undefined;
-  };
+  // Validate and get the URL to use
+  const validatedUrl = getValidatedUrl(imageSrc);
 
   return (
     <img
-      src={getOptimizedUrl(imageSrc, extractWidth(sizes))}
+      src={validatedUrl}
       alt={alt}
       loading={lazy ? 'lazy' : 'eager'}
       decoding="async"

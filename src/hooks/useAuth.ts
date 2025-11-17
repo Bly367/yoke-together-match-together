@@ -111,6 +111,18 @@ export function useUpdateProfile() {
     onSuccess: (user) => {
       // Update with server response
       queryClient.setQueryData(CURRENT_USER_KEY, user);
+      
+      // Invalidate related queries that depend on user profile data
+      // This ensures matches, duos, and other data show updated photo_url
+      // Use refetchType: 'active' to immediately refetch active queries
+      queryClient.invalidateQueries({ 
+        queryKey: ['matches'],
+        refetchType: 'active'
+      });
+      queryClient.invalidateQueries({ 
+        queryKey: ['duos'],
+        refetchType: 'active'
+      });
     },
   });
 }

@@ -186,23 +186,29 @@ export function MessageBubble({
                   ) : (
                     <>
                       {/* Attachment */}
-                      {message.attachment_url && (
-                        <div className={cn("mb-2", message.content && "mb-2")}>
-                          {message.attachment_type?.startsWith('image/') ? (
-                            <a
-                              href={message.attachment_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="block rounded-lg overflow-hidden max-w-sm"
-                            >
-                              <OptimizedImage
-                                src={message.attachment_url}
-                                alt={message.attachment_name || 'Attachment'}
-                                className="max-w-full h-auto rounded-lg"
-                                lazy={false}
-                              />
-                            </a>
-                          ) : (
+                      {message.attachment_url && (() => {
+                        // Determine if attachment is an image
+                        // Check attachment_type first, then infer from URL extension
+                        const isImage = message.attachment_type?.startsWith('image/') ||
+                          /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)(\?.*)?$/i.test(message.attachment_url);
+                        
+                        return (
+                          <div className={cn("mb-2", message.content && "mb-2")}>
+                            {isImage ? (
+                              <a
+                                href={message.attachment_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="block rounded-lg overflow-hidden max-w-sm"
+                              >
+                                <OptimizedImage
+                                  src={message.attachment_url}
+                                  alt={message.attachment_name || 'Image attachment'}
+                                  className="max-w-full h-auto rounded-lg cursor-pointer hover:opacity-90 transition-opacity"
+                                  lazy={false}
+                                />
+                              </a>
+                            ) : (
                             <a
                               href={message.attachment_url}
                               target="_blank"
@@ -226,9 +232,10 @@ export function MessageBubble({
                                 )}
                               </div>
                             </a>
-                          )}
-                        </div>
-                      )}
+                            )}
+                          </div>
+                        );
+                      })()}
                       {/* Message content */}
                       {message.content && (
                         <p className="text-sm whitespace-pre-wrap break-words">

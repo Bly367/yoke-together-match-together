@@ -3,6 +3,7 @@ import { List } from 'react-window';
 import { formatTime, formatRelativeTime, getOtherDuo, getMatchName } from '@/lib/utils';
 import { User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { OptimizedImage } from '@/components/OptimizedImage';
 import type { Match } from '@/services/matching.service';
 import type { Message } from '@/services/chat.service';
 
@@ -65,26 +66,22 @@ const MatchRow = memo(({ index, style, data }: MatchRowProps) => {
           {/* Duo Avatars */}
           <div className="relative flex-shrink-0">
             <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center shadow-md overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
-              {otherDuo.member1?.photo_url ? (
-                <img
-                  src={otherDuo.member1.photo_url}
-                  alt={otherDuo.member1.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <User className="w-6 h-6 text-primary" />
-              )}
+              <OptimizedImage
+                key={`${match.id}-member1-${otherDuo.member1?.photo_url || 'no-photo'}`}
+                src={otherDuo.member1?.photo_url}
+                alt={otherDuo.member1?.name || 'Member 1'}
+                className="w-full h-full"
+                fallbackIcon={<User className="w-6 h-6 text-primary" />}
+              />
             </div>
             <div className="w-12 h-12 rounded-full bg-secondary/30 flex items-center justify-center absolute -right-3 top-0 shadow-md border-2 border-card overflow-hidden ring-2 ring-transparent group-hover:ring-primary/20 transition-all">
-              {otherDuo.member2?.photo_url ? (
-                <img
-                  src={otherDuo.member2.photo_url}
-                  alt={otherDuo.member2.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <User className="w-6 h-6 text-primary" />
-              )}
+              <OptimizedImage
+                key={`${match.id}-member2-${otherDuo.member2?.photo_url || 'no-photo'}`}
+                src={otherDuo.member2?.photo_url}
+                alt={otherDuo.member2?.name || 'Member 2'}
+                className="w-full h-full"
+                fallbackIcon={<User className="w-6 h-6 text-primary" />}
+              />
             </div>
           </div>
 

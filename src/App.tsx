@@ -34,6 +34,7 @@ const Messages = lazy(() => import("./pages/Messages"));
 const Chat = lazy(() => import("./pages/Chat"));
 const PrivateMessages = lazy(() => import("./pages/PrivateMessages"));
 const PrivateChat = lazy(() => import("./pages/PrivateChat"));
+const GameSession = lazy(() => import("./pages/GameSession"));
 const Profile = lazy(() => import("./pages/Profile"));
 const Preferences = lazy(() => import("./pages/Preferences"));
 const NotificationSettings = lazy(() => import("./pages/NotificationSettings"));
@@ -190,6 +191,16 @@ const AppContent = () => {
                 <ProtectedRoute>
                   <FeatureErrorBoundary featureName="Private Chat">
                     <PrivateChat />
+                  </FeatureErrorBoundary>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path={`/match/:matchId/game/:sessionId`}
+              element={
+                <ProtectedRoute>
+                  <FeatureErrorBoundary featureName="Game Session">
+                    <GameSession />
                   </FeatureErrorBoundary>
                 </ProtectedRoute>
               }

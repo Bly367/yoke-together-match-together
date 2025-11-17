@@ -82,7 +82,41 @@ Enable in Dashboard if desired, or leave disabled if you have other password sec
 
 ## 🔵 INFO Level Warnings (Should Be Fixed)
 
-### 4. RLS Enabled No Policy - `private_conversations` and `private_messages`
+### 4. Function Search Path Mutable
+
+**Warning:**
+```
+Function `public.update_game_session_on_action` has a role mutable search_path
+Function `public.handle_new_user` has a role mutable search_path
+Function `public.update_game_sessions_updated_at` has a role mutable search_path
+```
+
+**Status:** ✅ **FIXED** - See migration `020_fix_function_search_paths.sql`
+
+**Why This Happened:**
+- Functions were created without `SET search_path` parameter
+- This can allow search_path injection attacks if an attacker can modify the search_path
+- Security best practice is to always set search_path explicitly
+
+**Resolution:**
+Migration `020_fix_function_search_paths.sql` adds `SET search_path = public` to all affected functions. Future migrations should always include this parameter.
+
+**Prevention:**
+Always include `SET search_path = public` (or `SET search_path = ''` for SECURITY DEFINER functions) when creating functions:
+
+```sql
+CREATE OR REPLACE FUNCTION my_function()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public  -- Always include this!
+AS $$
+BEGIN
+  -- function body
+END;
+$$;
+```
+
+### 5. RLS Enabled No Policy - `private_conversations` and `private_messages`
 
 **Warning:**
 ```
@@ -108,6 +142,7 @@ Migration `017_fix_private_messaging_rls.sql` ensures policies exist with simple
 | RLS Disabled - `spatial_ref_sys` | ERROR | Expected | None - Safe to ignore |
 | Extension in Public - `postgis` | WARN | Expected | None - Safe to ignore |
 | Leaked Password Protection | WARN | Optional | Enable in Dashboard if desired |
+| Function Search Path Mutable | WARN | Fixed | Run migration `020_fix_function_search_paths.sql` |
 | RLS No Policy - Private Tables | INFO | Fixed | Run migration `017_fix_private_messaging_rls.sql` |
 
 ---
@@ -132,4 +167,45 @@ While Supabase doesn't allow suppressing warnings via config, you can:
 
 **Last Updated:** 2024-12-19  
 **Status:** All warnings documented and explained
+
+---
+
+## 🛡️ Prevention Guide: Function Search Path Security
+
+To prevent function search_path warnings in future migrations, **always** include `SET search_path` when creating functions:
+
+### Standard Functions
+```sql
+CREATE OR REPLACE FUNCTION my_function()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SET search_path = public  -- Required for security
+AS $$
+BEGIN
+  -- function body
+END;
+$$;
+```
+
+### SECURITY DEFINER Functions
+```sql
+CREATE OR REPLACE FUNCTION my_secure_function()
+RETURNS TRIGGER
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public  -- Required for security (or use SET search_path = '')
+AS $$
+BEGIN
+  -- function body
+END;
+$$;
+```
+
+### Why This Matters
+- Prevents search_path injection attacks
+- Ensures functions always use the expected schema
+- Required by Supabase security best practices
+- Prevents linter warnings
+
+**Remember:** Every function definition should include `SET search_path = public` (or `SET search_path = ''` for SECURITY DEFINER functions that don't need public schema access).
 

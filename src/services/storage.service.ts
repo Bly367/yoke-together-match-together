@@ -11,29 +11,39 @@ const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif
  * Extract file path from a Supabase storage URL
  */
 function extractPathFromUrl(url: string, bucketName: string = PHOTOS_BUCKET): string {
+  if (!url || !url.trim()) {
+    throw new Error('URL is required');
+  }
+
+  const trimmedUrl = url.trim();
+
   // If it's already a path (no http/https), return as-is
-  if (!url.includes('http')) {
-    return url;
+  if (!trimmedUrl.includes('http')) {
+    return trimmedUrl;
   }
 
   // Extract path from full URL
   // Format: https://...supabase.co/storage/v1/object/public/{bucket}/{path}
   const storagePattern = `/storage/v1/object/public/${bucketName}/`;
-  if (url.includes(storagePattern)) {
-    const urlParts = url.split(storagePattern);
-    if (urlParts.length > 1) {
-      return urlParts[1];
+  if (trimmedUrl.includes(storagePattern)) {
+    const urlParts = trimmedUrl.split(storagePattern);
+    if (urlParts.length > 1 && urlParts[1]) {
+      // Remove query parameters if present
+      const path = urlParts[1].split('?')[0];
+      return path;
     }
   }
 
   // Fallback: try to extract from any storage URL pattern
-  const match = url.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/);
+  const match = trimmedUrl.match(/\/storage\/v1\/object\/public\/[^/]+\/(.+)$/);
   if (match && match[1]) {
-    return match[1];
+    // Remove query parameters if present
+    const path = match[1].split('?')[0];
+    return path;
   }
 
   // If no pattern matches, assume it's already a path
-  return url;
+  return trimmedUrl;
 }
 
 /**
@@ -73,6 +83,10 @@ export async function uploadPhoto(
     .from(PHOTOS_BUCKET)
     .getPublicUrl(filePath);
 
+  if (!data?.publicUrl) {
+    throw new Error('Failed to generate public URL for uploaded photo');
+  }
+
   return data.publicUrl;
 }
 
@@ -93,11 +107,15 @@ export async function deletePhoto(filePath: string): Promise<void> {
  * Get public URL for a photo
  */
 export function getPhotoUrl(filePath: string): string {
+  if (!filePath || !filePath.trim()) {
+    return '';
+  }
+
   const { data } = supabase.storage
     .from(PHOTOS_BUCKET)
-    .getPublicUrl(filePath);
+    .getPublicUrl(filePath.trim());
 
-  return data.publicUrl;
+  return data?.publicUrl || '';
 }
 
 /**
@@ -146,6 +164,10 @@ export async function uploadMessageAttachment(
   const { data } = supabase.storage
     .from(PHOTOS_BUCKET)
     .getPublicUrl(filePath);
+
+  if (!data?.publicUrl) {
+    throw new Error('Failed to generate public URL for uploaded attachment');
+  }
 
   return {
     url: data.publicUrl,

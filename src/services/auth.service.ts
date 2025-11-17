@@ -377,6 +377,18 @@ function validateProfileUpdate(profile: Partial<UserProfile>): void {
       throw new Error(`Preference must be one of: ${validPreferences.join(', ')}`);
     }
   }
+
+  // Validate photo_url if provided
+  if (profile.photo_url !== undefined) {
+    if (profile.photo_url !== null && profile.photo_url !== '') {
+      // Validate URL format
+      try {
+        new URL(profile.photo_url);
+      } catch {
+        throw new ValidationError('Photo URL must be a valid URL', 'photo_url');
+      }
+    }
+  }
 }
 
 /**
@@ -396,17 +408,177 @@ export async function updateProfile(profile: Partial<UserProfile>): Promise<User
   // Validate profile update fields
   validateProfileUpdate(profile);
 
-  const { data, error } = await supabase
+  // Filter out undefined values to avoid issues with Supabase
+  const updateData: Record<string, any> = {
+    updated_at: new Date().toISOString(),
+  };
+
+  // Only include defined values in the update
+  Object.keys(profile).forEach((key) => {
+    const value = profile[key as keyof UserProfile];
+    if (value !== undefined) {
+      // Convert empty strings to null for optional fields (like photo_url)
+      if (value === '' && (key === 'photo_url' || key === 'bio')) {
+        updateData[key] = null;
+      } else {
+        updateData[key] = value;
+      }
+    }
+  });
+
+  // Try update with select
+  let { data, error } = await supabase
     .from('profiles')
-    .update({
-      ...profile,
-      updated_at: new Date().toISOString(),
-    })
+    .update(updateData)
     .eq('id', user.id)
     .select()
     .single();
 
-  if (error) throw error;
+  // If update fails with "Cannot coerce" or similar, try update without select first
+  // then fetch separately (this handles RLS issues where update works but select fails)
+  if (error && (error.message?.includes('Cannot coerce') || error.message?.includes('single JSON object'))) {
+    logger.warn('Update select failed, trying update without select then fetch', { userId: user.id, error: error.message });
+    
+    // Try update without select
+    const { error: updateOnlyError } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', user.id);
+
+    if (updateOnlyError) {
+      logger.error('Update without select also failed', updateOnlyError, { userId: user.id });
+      error = updateOnlyError;
+    } else {
+      // Update succeeded, now fetch the profile
+      const { data: fetchedData, error: fetchError } = await supabase
+        .from('profiles')
+        .select()
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError) {
+        logger.error('Failed to fetch profile after update', fetchError, { userId: user.id });
+        error = fetchError;
+      } else {
+        // Success! Return the fetched data
+        if (!fetchedData) {
+          throw new Error('Profile update succeeded but fetch returned no data');
+        }
+        return fetchedData;
+      }
+    }
+  }
+
+  if (error) {
+    logger.error('Profile update failed', error, { userId: user.id, updateData });
+    
+    // Handle case where profile doesn't exist or update returned no rows
+    // PGRST116 = no rows returned, PGRST110 = multiple rows (shouldn't happen but handle it)
+    if (error.code === 'PGRST116' || error.code === 'PGRST110') {
+      logger.info('Profile update returned no rows, checking if profile exists', { userId: user.id });
+      
+      // First, check if profile actually exists (might be RLS issue)
+      const { data: existingProfile, error: checkError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (checkError && checkError.code !== 'PGRST116') {
+        // Real error checking for profile
+        logger.error('Error checking if profile exists', checkError, { userId: user.id });
+        throw checkError;
+      }
+
+      if (existingProfile) {
+        // Profile exists but update failed - likely RLS issue
+        // Try update again with a simpler approach
+        logger.warn('Profile exists but update failed, retrying update', { userId: user.id });
+        const { data: retryData, error: retryError } = await supabase
+          .from('profiles')
+          .update(updateData)
+          .eq('id', user.id)
+          .select()
+          .single();
+
+        if (retryError) {
+          logger.error('Retry update also failed', retryError, { userId: user.id });
+          throw retryError;
+        }
+
+        if (!retryData) {
+          throw new Error('Profile update succeeded but no data was returned');
+        }
+
+        return retryData;
+      }
+
+      // Profile truly doesn't exist, create it with upsert to handle race conditions
+      logger.info('Profile does not exist, creating new profile', { userId: user.id });
+      
+      const insertData = {
+        id: user.id,
+        email: user.email || '',
+        name: user.user_metadata?.name || 'User',
+        ...updateData,
+      };
+
+      // Use upsert (ON CONFLICT DO UPDATE) to handle race conditions
+      const { data: newProfile, error: createError } = await supabase
+        .from('profiles')
+        .upsert(insertData, {
+          onConflict: 'id',
+        })
+        .select()
+        .single();
+
+      if (createError) {
+        logger.error('Failed to create profile after update failed', createError, { userId: user.id });
+        
+        // If it's a duplicate key error, the profile was created by another process
+        // Try to fetch it instead
+        if (createError.code === '23505' || createError.message?.includes('duplicate key')) {
+          logger.info('Profile was created by another process, fetching it', { userId: user.id });
+          const { data: fetchedProfile, error: fetchError } = await supabase
+            .from('profiles')
+            .select()
+            .eq('id', user.id)
+            .single();
+
+          if (fetchError) {
+            logger.error('Failed to fetch profile after duplicate key error', fetchError, { userId: user.id });
+            handleProfileError(fetchError, 'fetch');
+          }
+
+          // Try updating the fetched profile
+          if (fetchedProfile) {
+            const { data: updatedProfile, error: updateError } = await supabase
+              .from('profiles')
+              .update(updateData)
+              .eq('id', user.id)
+              .select()
+              .single();
+
+            if (updateError) {
+              logger.error('Failed to update fetched profile', updateError, { userId: user.id });
+              throw updateError;
+            }
+
+            return updatedProfile || fetchedProfile;
+          }
+        }
+        
+        handleProfileError(createError, 'create');
+      }
+      return newProfile;
+    }
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error('Profile update succeeded but no data was returned');
+  }
+
   return data;
 }
 
