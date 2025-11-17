@@ -806,13 +806,8 @@ export async function broadcastTypingIndicator(
 ): Promise<void> {
   const channel = supabase.channel(`typing:${matchId}`);
   
-  // Subscribe to the channel before sending
-  await channel.subscribe();
-  
-  // Wait a bit for subscription to be ready
-  await new Promise(resolve => setTimeout(resolve, 100));
-  
-  const status = await channel.send({
+  // Use httpSend() for REST API delivery instead of deprecated send()
+  const status = await channel.httpSend({
     type: 'broadcast',
     event: 'typing',
     payload: { userId, userName, isTyping },
