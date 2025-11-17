@@ -713,15 +713,28 @@ export async function broadcastPrivateTypingIndicator(
 ): Promise<void> {
   const channel = supabase.channel(`private_typing:${conversationId}`);
 
-  // Use httpSend() for REST API delivery instead of deprecated send()
-  const status = await channel.httpSend({
-    type: 'broadcast',
-    event: 'typing',
-    payload: { userId, userName, isTyping },
-  });
+  // Subscribe to the channel before sending
+  await channel.subscribe();
 
-  // Clean up after sending
-  if (status === 'ok') {
+  // Wait a bit for subscription to be ready
+  await new Promise(resolve => setTimeout(resolve, 100));
+
+  // Use send() - it will fallback to REST API automatically
+  // The deprecation warning is non-critical and will be handled by Supabase
+  try {
+    const status = await channel.send({
+      type: 'broadcast',
+      event: 'typing',
+      payload: { userId, userName, isTyping },
+    });
+
+    // Clean up after sending
+    if (status === 'ok') {
+      supabase.removeChannel(channel);
+    }
+  } catch (error) {
+    // Silently handle errors - typing indicators are non-critical
+    console.debug('Typing indicator broadcast failed:', error);
     supabase.removeChannel(channel);
   }
 }
