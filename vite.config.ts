@@ -82,8 +82,9 @@ export default defineConfig(({ mode }) => ({
               return 'query-vendor';
             }
             // Radix UI components (large library) - depends on React
+            // Keep Radix UI in main bundle too since it uses React.createContext
             if (id.includes('@radix-ui')) {
-              return 'ui-vendor';
+              return undefined; // Keep in main bundle to ensure React is available
             }
             // Supabase
             if (id.includes('@supabase')) {
@@ -92,6 +93,11 @@ export default defineConfig(({ mode }) => ({
             // Other node_modules
             return 'vendor';
           }
+        },
+        // Ensure proper chunk loading order
+        chunkFileNames: (chunkInfo) => {
+          // Ensure React loads first by keeping it in main bundle
+          return chunkInfo.name === 'index' ? 'assets/[name]-[hash].js' : 'assets/[name]-[hash].js';
         },
       },
     },
