@@ -257,6 +257,32 @@ const App = () => {
   React.useEffect(() => {
     initErrorTracking();
     trackWebVitals();
+    
+    // Add global error handlers to catch unhandled errors
+    const handleError = (event: ErrorEvent) => {
+      logger.error('Unhandled error', event.error, { 
+        message: event.message, 
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno 
+      });
+    };
+    
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      logger.error('Unhandled promise rejection', event.reason, {
+        type: typeof event.reason,
+      });
+      // Prevent default browser error handling
+      event.preventDefault();
+    };
+    
+    window.addEventListener('error', handleError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+    
+    return () => {
+      window.removeEventListener('error', handleError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
   }, []);
 
   // Register service worker for PWA functionality

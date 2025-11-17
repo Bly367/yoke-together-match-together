@@ -14,7 +14,26 @@ export function useAuth() {
 
   const { data: user, isLoading, error } = useQuery({
     queryKey: CURRENT_USER_KEY,
-    queryFn: getCurrentUser,
+    queryFn: async () => {
+      try {
+        return await getCurrentUser();
+      } catch (error: any) {
+        // Log error but return null instead of throwing to prevent app crash
+        console.error('Error getting current user:', error);
+        
+        // If it's a network/configuration error, return null (user not authenticated)
+        if (error?.message?.includes('fetch') || 
+            error?.message?.includes('Failed to fetch') ||
+            error?.message?.includes('NetworkError') ||
+            error?.message?.includes('Invalid API key') ||
+            error?.message?.includes('placeholder')) {
+          return null;
+        }
+        
+        // Re-throw other errors (they'll be handled by React Query's error handling)
+        throw error;
+      }
+    },
     retry: (failureCount, error) => {
       // Don't retry on auth errors (401, 403, or "Not authenticated")
       if (error?.message?.includes('Not authenticated') || 
@@ -22,10 +41,21 @@ export function useAuth() {
           error?.message?.includes('permission')) {
         return false;
       }
-      // Retry up to 3 times for network errors
+      
+      // Don't retry on network/configuration errors
+      if (error?.message?.includes('fetch') || 
+          error?.message?.includes('Failed to fetch') ||
+          error?.message?.includes('NetworkError') ||
+          error?.message?.includes('Invalid API key')) {
+        return false;
+      }
+      
+      // Retry up to 3 times for other network errors
       return failureCount < 3;
     },
     retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
+    // Set staleTime to prevent unnecessary refetches
+    staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
   const signOutMutation = useMutation({

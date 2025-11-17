@@ -1,4 +1,4 @@
-import { supabase } from '@/integrations/supabase/client';
+import { supabase, isSupabaseConfigured } from '@/integrations/supabase/client';
 import { retryWithBackoff } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 import { 
@@ -304,24 +304,72 @@ export async function signOut(): Promise<void> {
  * @throws {NotFoundError} If profile doesn't exist and can't be created
  */
 export async function getCurrentUser(): Promise<UserProfile | null> {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return null;
+  // If Supabase is not configured, return null immediately
+  if (!isSupabaseConfigured()) {
+    logger.warn('Supabase not configured, returning null user');
+    return null;
+  }
 
-  const { data: profile, error } = await supabase
-    .from('profiles')
-    .select()
-    .eq('id', user.id)
-    .single();
-
-  if (error) {
-    // If profile doesn't exist, return null (user needs to complete profile setup)
-    if (error.code === 'PGRST116') {
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    // Handle auth errors gracefully
+    if (authError) {
+      // If it's a network error or invalid configuration, return null
+      if (authError.message?.includes('fetch') || 
+          authError.message?.includes('Failed to fetch') ||
+          authError.message?.includes('NetworkError') ||
+          authError.message?.includes('Invalid API key')) {
+        logger.error('Supabase auth error (likely configuration issue)', authError);
+        return null;
+      }
+      // For other auth errors, log and return null (user not authenticated)
+      logger.debug('Auth error (user not authenticated)', authError);
       return null;
     }
-    // Use shared error handler for other errors
-    handleProfileError(error, 'fetch');
+    
+    if (!user) return null;
+
+    const { data: profile, error } = await supabase
+      .from('profiles')
+      .select()
+      .eq('id', user.id)
+      .single();
+
+    if (error) {
+      // If profile doesn't exist, return null (user needs to complete profile setup)
+      if (error.code === 'PGRST116') {
+        return null;
+      }
+      
+      // Handle network/configuration errors gracefully
+      if (error.message?.includes('fetch') || 
+          error.message?.includes('Failed to fetch') ||
+          error.message?.includes('NetworkError')) {
+        logger.error('Supabase query error (likely configuration issue)', error);
+        return null;
+      }
+      
+      // Use shared error handler for other errors
+      handleProfileError(error, 'fetch');
+    }
+    return profile;
+  } catch (error: any) {
+    // Catch any unexpected errors and log them
+    logger.error('Unexpected error in getCurrentUser', error);
+    
+    // If it's a network error or configuration issue, return null instead of crashing
+    if (error?.message?.includes('fetch') || 
+        error?.message?.includes('Failed to fetch') ||
+        error?.message?.includes('NetworkError') ||
+        error?.message?.includes('Invalid API key') ||
+        error?.message?.includes('placeholder')) {
+      return null;
+    }
+    
+    // Re-throw other errors
+    throw error;
   }
-  return profile;
 }
 
 /**
