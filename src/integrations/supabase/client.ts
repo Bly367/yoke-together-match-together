@@ -17,19 +17,19 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Validate environment variables in development
-if (import.meta.env.DEV) {
-  if (!SUPABASE_URL) {
-    console.error(
-      '❌ Missing VITE_SUPABASE_URL environment variable. ' +
-      'Please add it to your .env file. See SETUP_INSTRUCTIONS.md for details.'
-    );
-  }
-  if (!SUPABASE_PUBLISHABLE_KEY) {
-    console.error(
-      '❌ Missing VITE_SUPABASE_PUBLISHABLE_KEY environment variable. ' +
-      'Please add it to your .env file. See SETUP_INSTRUCTIONS.md for details.'
-    );
+// Validate environment variables
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  const errorMessage = 
+    '❌ Missing required Supabase environment variables. ' +
+    'Please set VITE_SUPABASE_URL and VITE_SUPABASE_PUBLISHABLE_KEY. ' +
+    'See DEPLOYMENT.md or SETUP_INSTRUCTIONS.md for details.';
+  
+  if (import.meta.env.PROD) {
+    // In production, throw an error to prevent runtime issues
+    throw new Error(errorMessage);
+  } else {
+    // In development, log error but allow app to continue
+    console.error(errorMessage);
   }
 }
 

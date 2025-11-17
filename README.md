@@ -187,11 +187,35 @@ npm run dev
 npm run build
 ```
 
+### Preview production build
+
+```bash
+npm run preview
+```
+
 ### Linting
 
 ```bash
 npm run lint
 ```
+
+## Deployment
+
+Ready to deploy your app? See the **[Deployment Guide](./DEPLOYMENT.md)** for step-by-step instructions.
+
+### Quick Deploy to Vercel
+
+1. Push your code to GitHub
+2. Sign up at [vercel.com](https://vercel.com)
+3. Import your GitHub repository
+4. Add environment variables:
+   - `VITE_SUPABASE_URL`
+   - `VITE_SUPABASE_PUBLISHABLE_KEY`
+5. Deploy!
+
+Your app will be live in minutes with automatic HTTPS, CDN, and continuous deployments.
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ## Database Schema
 
@@ -205,6 +229,7 @@ See `supabase/migrations/001_initial_schema.sql` for the complete database schem
 ## Documentation
 
 ### Essential Docs
+- **[Deployment Guide](./DEPLOYMENT.md)** - Step-by-step deployment instructions
 - **[API Documentation](./API.md)** - Complete API reference for all service functions
 - **[Architecture Documentation](./ARCHITECTURE.md)** - System architecture and design decisions
 - **[Product Requirements Document](./PRD.md)** - Complete product requirements and specifications
