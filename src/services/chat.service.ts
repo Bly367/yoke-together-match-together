@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+import { trackMessageSent } from './preferenceEvents.service';
 
 /**
  * Message type
@@ -280,7 +281,6 @@ export async function sendMessage(
   // Use setTimeout to avoid blocking message send
   setTimeout(async () => {
     try {
-      const { trackMessageSent } = await import('./preferenceEvents.service');
       // Find which duo the sender belongs to
       const { data: senderDuo } = await supabase
         .from('duos')
