@@ -280,7 +280,7 @@ export async function sendMessage(
   // Use setTimeout to avoid blocking message send
   setTimeout(async () => {
     try {
-      const { trackMessageSent } = await import('./preferenceEvents.service');
+      const { trackMessageSent } = await import('@/services/preferenceEvents.service');
       // Find which duo the sender belongs to
       const { data: senderDuo } = await supabase
         .from('duos')
