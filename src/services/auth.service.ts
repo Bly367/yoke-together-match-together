@@ -480,89 +480,76 @@ export async function updateProfile(profile: Partial<UserProfile>): Promise<User
     }
   });
 
-  // Try update with select
-  let { data, error } = await supabase
+  // Try update without select first to avoid 406 errors
+  // The 406 error can occur when UPDATE with SELECT fails due to RLS
+  const { error: updateError } = await supabase
     .from('profiles')
     .update(updateData)
-    .eq('id', user.id)
-    .select()
-    .maybeSingle();
+    .eq('id', user.id);
 
-  // If update succeeds and we have data, return it
-  if (data && !error) {
-    return data;
-  }
-
-  // If update fails with "Cannot coerce", 406, or similar, try update without select first
-  // then fetch separately (this handles RLS issues where update works but select fails)
-  if (error || !data) {
-    const errorMessage = error?.message || '';
-    const errorStatus = (error as any)?.status;
+  if (updateError) {
+    logger.error('Profile update failed', updateError, { userId: user.id, updateData });
     
-    if (error && (
-      errorMessage.includes('Cannot coerce') || 
-      errorMessage.includes('single JSON object') ||
-      errorStatus === 406
-    )) {
-      logger.warn('Update select failed, trying update without select then fetch', { 
-        userId: user.id, 
-        error: errorMessage,
-        status: errorStatus 
-      });
-    }
-    
-    // Try update without select
-    const { error: updateOnlyError } = await supabase
-      .from('profiles')
-      .update(updateData)
-      .eq('id', user.id);
-
-    if (updateOnlyError) {
-      logger.error('Update without select also failed', updateOnlyError, { userId: user.id });
-      error = updateOnlyError;
-    } else {
-      // Update succeeded, now fetch the profile using maybeSingle to handle 406 gracefully
-      const { data: fetchedData, error: fetchError } = await supabase
+    // Handle 406 errors - might be RLS policy issue
+    if ((updateError as any)?.status === 406) {
+      logger.warn('Profile update returned 406 - checking RLS policy', { userId: user.id });
+      // Check if profile exists
+      const { data: existingProfile } = await supabase
         .from('profiles')
-        .select()
+        .select('id')
         .eq('id', user.id)
         .maybeSingle();
-
-      if (fetchError) {
-        // Handle 406 errors gracefully - update worked but can't fetch due to RLS
-        if (fetchError.status === 406) {
-          logger.warn('Profile update succeeded but fetch returned 406 (RLS issue)', { userId: user.id });
-          // Return a partial profile with the updated data
-          // The user will see the update on next page load
-          return {
-            id: user.id,
-            email: user.email || '',
-            name: user.user_metadata?.name || 'User',
-            ...updateData,
-            created_at: new Date().toISOString(),
-            updated_at: updateData.updated_at,
-          } as UserProfile;
-        }
-        logger.error('Failed to fetch profile after update', fetchError, { userId: user.id });
-        error = fetchError;
+      
+      if (existingProfile) {
+        throw new Error('Profile update failed due to RLS policy. Please check your database policies.');
       } else {
-        // Success! Return the fetched data
-        if (!fetchedData) {
-          // Update worked but no data returned - return partial profile
-          logger.warn('Profile update succeeded but fetch returned no data', { userId: user.id });
-          return {
-            id: user.id,
-            email: user.email || '',
-            name: user.user_metadata?.name || 'User',
-            ...updateData,
-            created_at: new Date().toISOString(),
-            updated_at: updateData.updated_at,
-          } as UserProfile;
-        }
-        return fetchedData;
+        throw new Error('Profile does not exist. Please create your profile first.');
       }
     }
+    
+    throw updateError;
   }
+
+  // Update succeeded, now fetch the profile
+  const { data: fetchedData, error: fetchError } = await supabase
+    .from('profiles')
+    .select()
+    .eq('id', user.id)
+    .maybeSingle();
+
+  if (fetchError) {
+    // Handle 406 errors gracefully - update worked but can't fetch due to RLS
+    if ((fetchError as any)?.status === 406) {
+      logger.warn('Profile update succeeded but fetch returned 406 (RLS issue)', { userId: user.id });
+      // Return a partial profile with the updated data
+      // The user will see the update on next page load
+      return {
+        id: user.id,
+        email: user.email || '',
+        name: user.user_metadata?.name || 'User',
+        ...updateData,
+        created_at: new Date().toISOString(),
+        updated_at: updateData.updated_at,
+      } as UserProfile;
+    }
+    logger.error('Failed to fetch profile after update', fetchError, { userId: user.id });
+    throw fetchError;
+  }
+
+  if (!fetchedData) {
+    // Update worked but no data returned - return partial profile
+    logger.warn('Profile update succeeded but fetch returned no data', { userId: user.id });
+    return {
+      id: user.id,
+      email: user.email || '',
+      name: user.user_metadata?.name || 'User',
+      ...updateData,
+      created_at: new Date().toISOString(),
+      updated_at: updateData.updated_at,
+    } as UserProfile;
+  }
+
+  return fetchedData;
 
   if (error) {
     logger.error('Profile update failed', error, { userId: user.id, updateData });
