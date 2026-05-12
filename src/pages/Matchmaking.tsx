@@ -2,7 +2,7 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from "react"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import { Heart, X, Loader2, MessageCircle, User, Filter, RotateCcw } from "lucide-react";
+import { Heart, X, Loader2, MessageCircle, User, Filter, RotateCcw, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
 import chickMascot from "@/assets/chick-mascot.png";
@@ -25,6 +25,13 @@ import {
 import { Label } from "@/components/ui/label";
 import { canDuosMatch, duoMatchesPreferences } from "@/lib/preferences";
 import { useUserPreferences } from "@/hooks/usePreferences";
+import { useRankDuos } from "@/hooks/useRanking";
+import {
+  useTrackLike,
+  useTrackPass,
+  useTrackView,
+  useTrackMatchSuccess,
+} from "@/hooks/usePreferenceEvents";
 
 interface SwipeState {
   x: number;
@@ -81,6 +88,12 @@ const MatchmakingComponent = () => {
   const { data: activeDuos = [], isLoading: activeDuosLoading } = useActiveDuosForMatching(
     swipedIds
   );
+
+  // V2 AI preference tracking - feeds the learning system (see migration 023)
+  const trackLikeMutation = useTrackLike();
+  const trackPassMutation = useTrackPass();
+  const trackViewMutation = useTrackView();
+  const trackMatchSuccessMutation = useTrackMatchSuccess();
 
   // Filter duos using advanced preferences system
   const availableDuos = useMemo(() => {
@@ -167,9 +180,55 @@ const MatchmakingComponent = () => {
     });
   }, [activeDuos, filters, userDuo, userPreferences, userLocation, user]);
 
-  const currentDuo = availableDuos[currentIndex];
+  // V2 AI ranking: reorder available duos by learned compatibility score.
+  // Falls back gracefully to filter order when embeddings aren't computed yet.
+  const { data: rankedDuos } = useRankDuos(
+    user?.id || null,
+    userDuo?.id || null,
+    availableDuos,
+    !!user?.id && !!userDuo?.id && availableDuos.length > 0,
+  );
+
+  /**
+   * Final ordered list of duos to show — AI-ranked when available,
+   * otherwise the filtered list in its existing order.
+   */
+  const orderedDuos = useMemo(() => {
+    if (!rankedDuos || rankedDuos.length === 0) return availableDuos;
+    return rankedDuos.map((r) => r.duo);
+  }, [rankedDuos, availableDuos]);
+
+  /**
+   * Lookup of compatibility scores keyed by duo id for badge rendering.
+   */
+  const compatibilityScores = useMemo(() => {
+    if (!rankedDuos) return new Map<string, number>();
+    return new Map(rankedDuos.map((r) => [r.duo.id, r.score] as const));
+  }, [rankedDuos]);
+
+  const currentDuo = orderedDuos[currentIndex];
+  const currentCompatibility =
+    currentDuo ? compatibilityScores.get(currentDuo.id) : undefined;
   const swipeMutation = useSwipe();
   const undoSwipeMutation = useUndoSwipe();
+
+  // Track view event when the visible duo changes (for AI behavioral signal)
+  const viewStartRef = useRef<number | null>(null);
+  useEffect(() => {
+    if (!user?.id || !currentDuo) return;
+    viewStartRef.current = Date.now();
+    const duoId = currentDuo.id;
+    return () => {
+      const start = viewStartRef.current;
+      if (!start) return;
+      const dwell = Date.now() - start;
+      // Only track meaningful views to avoid noise
+      if (dwell >= 600) {
+        trackViewMutation.mutate({ userId: user.id, duoId, dwellTimeMs: dwell });
+      }
+      viewStartRef.current = null;
+    };
+  }, [user?.id, currentDuo, trackViewMutation]);
 
   // Swipe gesture handlers
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -272,6 +331,15 @@ const MatchmakingComponent = () => {
     // Store last swipe for undo
     setLastSwipe({ duoId: currentDuo.id, action: liked ? 'like' : 'pass' });
 
+    // V2 preference learning signal — fire-and-forget so it never blocks UX
+    if (user?.id) {
+      if (liked) {
+        trackLikeMutation.mutate({ userId: user.id, duoId: currentDuo.id });
+      } else {
+        trackPassMutation.mutate({ userId: user.id, duoId: currentDuo.id });
+      }
+    }
+
     try {
       await swipeMutation.mutateAsync({
         swiperDuoId: userDuo.id,
@@ -283,6 +351,10 @@ const MatchmakingComponent = () => {
       if (liked) {
         const match = await checkMatch(userDuo.id, currentDuo.id);
         if (match) {
+          // Track positive outcome for AI learning
+          if (user?.id) {
+            trackMatchSuccessMutation.mutate({ userId: user.id, duoId: currentDuo.id });
+          }
           setIsMatched(true);
           toast.success("It's a match! 🎉");
           setTimeout(() => {
@@ -295,7 +367,7 @@ const MatchmakingComponent = () => {
       }
 
       // Move to next duo
-      if (currentIndex < availableDuos.length - 1) {
+      if (currentIndex < orderedDuos.length - 1) {
         setCurrentIndex(currentIndex + 1);
       } else {
         toast("No more duos to show", { description: "Check back later!" });
@@ -307,7 +379,19 @@ const MatchmakingComponent = () => {
     } catch (error: any) {
       toast.error(error.message || "Failed to swipe");
     }
-  }, [userDuo, currentDuo, swipeMutation, currentIndex, availableDuos.length, queryClient, navigate]);
+  }, [
+    userDuo,
+    currentDuo,
+    swipeMutation,
+    currentIndex,
+    orderedDuos.length,
+    queryClient,
+    navigate,
+    user?.id,
+    trackLikeMutation,
+    trackPassMutation,
+    trackMatchSuccessMutation,
+  ]);
 
   const handleUndo = useCallback(async () => {
     if (!lastSwipe || !userDuo) return;
@@ -664,12 +748,25 @@ const MatchmakingComponent = () => {
 
           {/* Info */}
           <div className="p-6 space-y-4">
-            <div>
-              <h3 className="text-xl font-bold text-foreground mb-2">
-                {currentDuo.tagline || currentDuo.name || `${currentDuo.member1.name} & ${currentDuo.member2.name}`}
-              </h3>
-              {currentDuo.bio && (
-                <p className="text-muted-foreground">{currentDuo.bio}</p>
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <h3 className="text-xl font-bold text-foreground mb-2">
+                  {currentDuo.tagline || currentDuo.name || `${currentDuo.member1.name} & ${currentDuo.member2.name}`}
+                </h3>
+                {currentDuo.bio && (
+                  <p className="text-muted-foreground">{currentDuo.bio}</p>
+                )}
+              </div>
+              {typeof currentCompatibility === "number" && (
+                <Badge
+                  variant="default"
+                  className="bg-gradient-to-br from-yolk-yellow to-yolk-peach text-foreground border-transparent shadow-[var(--shadow-soft)] flex items-center gap-1 shrink-0"
+                  title="AI-predicted compatibility based on your photos, prompts, and behavior"
+                  aria-label={`Compatibility score: ${Math.round(currentCompatibility * 100)} percent`}
+                >
+                  <Sparkles className="w-3 h-3" aria-hidden="true" />
+                  {Math.round(currentCompatibility * 100)}%
+                </Badge>
               )}
             </div>
 
@@ -726,7 +823,7 @@ const MatchmakingComponent = () => {
         {/* Progress */}
         <div className="text-center mt-4 text-sm text-muted-foreground" role="status" aria-live="polite">
           <span className="sr-only">Progress: </span>
-          {currentIndex + 1} of {availableDuos.length} duos
+          {currentIndex + 1} of {orderedDuos.length} duos
         </div>
       </div>
 
