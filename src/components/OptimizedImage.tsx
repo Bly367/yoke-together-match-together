@@ -2,7 +2,7 @@ import { useState, useEffect, ImgHTMLAttributes } from 'react';
 import { cn } from '@/lib/utils';
 import { User } from 'lucide-react';
 
-interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'loading'> {
+interface OptimizedImageProps extends Omit<ImgHTMLAttributes<HTMLImageElement>, 'loading' | 'src'> {
   src?: string | null;
   alt: string;
   fallbackIcon?: React.ReactNode;

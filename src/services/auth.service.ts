@@ -143,7 +143,8 @@ export async function signUp(email: string, password: string, name: string): Pro
   });
 
   if (error) throw error;
-  if (!data.user) throw new Error('Failed to create user');
+  const newUser = data.user;
+  if (!newUser) throw new Error('Failed to create user');
 
   // Retry logic to wait for profile creation (trigger may create it automatically)
   // Use retry with exponential backoff instead of fixed setTimeout
@@ -154,7 +155,7 @@ export async function signUp(email: string, password: string, name: string): Pro
       const { data: existingProfile, error: fetchError } = await supabase
         .from('profiles')
         .select()
-        .eq('id', data.user.id)
+        .eq('id', newUser.id)
         .single();
 
       if (existingProfile && !fetchError) {
@@ -163,7 +164,7 @@ export async function signUp(email: string, password: string, name: string): Pro
           const { data: updatedProfile, error: updateError } = await supabase
             .from('profiles')
             .update({ name, email })
-            .eq('id', data.user.id)
+            .eq('id', newUser.id)
             .select()
             .single();
           
@@ -181,7 +182,7 @@ export async function signUp(email: string, password: string, name: string): Pro
       const { data: newProfile, error: profileError } = await supabase
         .from('profiles')
         .insert({
-          id: data.user.id,
+          id: newUser.id,
           email,
           name,
         })
@@ -200,7 +201,7 @@ export async function signUp(email: string, password: string, name: string): Pro
       return newProfile;
     }, 5, 100); // 5 attempts, starting with 100ms delay
   } catch (error) {
-    logger.error('Profile creation/retrieval failed after retries', error, { userId: data.user.id });
+    logger.error('Profile creation/retrieval failed after retries', error, { userId: newUser.id });
     throw error;
   }
 
@@ -357,10 +358,9 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       if (error.code === 'PGRST116') {
         return null;
       }
-      
-      // Handle 406 (Not Acceptable) - might be RLS or content negotiation issue
-      if (error.status === 406) {
-        logger.warn('Profile query returned 406, might be RLS issue', error);
+
+      if (error.message?.includes('406') || (typeof error.details === 'string' && error.details.includes('406'))) {
+        logger.warn('Profile query returned not acceptable, might be RLS issue', error);
         return null;
       }
       

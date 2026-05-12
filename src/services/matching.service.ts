@@ -1,5 +1,4 @@
 import { supabase } from '@/integrations/supabase/client';
-import { updateEloAfterMatch } from './elo.service';
 import type { DuoWithMembers } from './duo.service';
 
 /**

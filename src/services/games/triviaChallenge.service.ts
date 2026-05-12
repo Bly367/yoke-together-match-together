@@ -1,4 +1,4 @@
-import type { GameSession, GameAction } from '../games.service';
+import type { GameAction } from '../games.service';
 
 /**
  * Trivia question
@@ -233,7 +233,7 @@ export function isTriviaChallengeComplete(state: TriviaChallengeState): boolean 
  */
 export function calculateTriviaChallengeResults(
   state: TriviaChallengeState,
-  actions: GameAction[]
+  _actions: GameAction[]
 ): Array<{ user_id: string; final_score: number; rank: number; achievements: string[] }> {
   const playerIds = Object.keys(state.scores);
   const results = playerIds.map(userId => ({

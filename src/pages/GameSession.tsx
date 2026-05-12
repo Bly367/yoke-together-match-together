@@ -79,19 +79,19 @@ export default function GameSession() {
     try {
       switch (gameName) {
         case 'two-truths-and-a-lie':
-          initialState = initializeTwoTruthsAndLieState(playerIds);
+          initialState = initializeTwoTruthsAndLieState(playerIds) as unknown as Record<string, unknown>;
           break;
         case 'would-you-rather':
-          initialState = initializeWouldYouRatherState(playerIds);
+          initialState = initializeWouldYouRatherState(playerIds) as unknown as Record<string, unknown>;
           break;
         case 'this-or-that':
-          initialState = initializeThisOrThatState(playerIds);
+          initialState = initializeThisOrThatState(playerIds) as unknown as Record<string, unknown>;
           break;
         case 'compatibility-quiz':
-          initialState = initializeCompatibilityQuizState(playerIds);
+          initialState = initializeCompatibilityQuizState(playerIds) as unknown as Record<string, unknown>;
           break;
         case 'trivia-challenge':
-          initialState = initializeTriviaChallengeState(playerIds);
+          initialState = initializeTriviaChallengeState(playerIds) as unknown as Record<string, unknown>;
           break;
         default:
           initialState = { round: 1, started: true };

@@ -1,4 +1,4 @@
-import type { GameSession, GameAction } from '../games.service';
+import type { GameAction } from '../games.service';
 
 /**
  * Question for Would You Rather
@@ -167,7 +167,7 @@ export function isWouldYouRatherComplete(state: WouldYouRatherState): boolean {
  */
 export function calculateWouldYouRatherResults(
   state: WouldYouRatherState,
-  actions: GameAction[]
+  _actions: GameAction[]
 ): Array<{ user_id: string; final_score: number; rank: number; achievements: string[] }> {
   const playerIds = Object.keys(state.scores);
   const results = playerIds.map(userId => ({

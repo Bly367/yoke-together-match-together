@@ -1,4 +1,4 @@
-import type { GameSession, GameAction } from '../games.service';
+import type { GameAction } from '../games.service';
 
 /**
  * Question for This or That
@@ -168,7 +168,7 @@ export function isThisOrThatComplete(state: ThisOrThatState): boolean {
  */
 export function calculateThisOrThatResults(
   state: ThisOrThatState,
-  actions: GameAction[]
+  _actions: GameAction[]
 ): Array<{ user_id: string; final_score: number; rank: number; achievements: string[] }> {
   const playerIds = Object.keys(state.scores);
   const results = playerIds.map(userId => ({

@@ -38,7 +38,7 @@ export function TwoTruthsAndLie({ sessionId }: { sessionId: string }) {
   const [targetUserId, setTargetUserId] = useState<string | null>(null);
   const [guessedLieIndex, setGuessedLieIndex] = useState<number>(-1);
 
-  const gameState = (session?.game_state || {}) as TwoTruthsAndLieState;
+  const gameState = (session?.game_state ?? {}) as unknown as TwoTruthsAndLieState;
   const playerIds = session?.players?.filter(p => p.is_active).map(p => p.user_id) || [];
   const activePlayers = session?.players?.filter(p => p.is_active) || [];
 

@@ -10,7 +10,6 @@ import { logger } from '@/lib/logger';
 import type { WouldYouRatherState } from '@/services/games/wouldYouRather.service';
 import {
   initializeWouldYouRatherState,
-  validateWouldYouRatherAction,
   processWouldYouRatherAction,
   isWouldYouRatherComplete,
   calculateWouldYouRatherResults,
@@ -33,7 +32,7 @@ export function WouldYouRather({ sessionId }: { sessionId: string }) {
 
   const [selectedChoice, setSelectedChoice] = useState<'A' | 'B' | null>(null);
 
-  const gameState = (session?.game_state || {}) as WouldYouRatherState;
+  const gameState = (session?.game_state ?? {}) as unknown as WouldYouRatherState;
   const playerIds = session?.players?.filter(p => p.is_active).map(p => p.user_id) || [];
   const activePlayers = session?.players?.filter(p => p.is_active) || [];
 
@@ -112,7 +111,6 @@ export function WouldYouRather({ sessionId }: { sessionId: string }) {
   }
 
   const userVote = currentState.votes[user?.id || ''];
-  const allVoted = playerIds.every(id => currentState.votes[id]);
 
   // Complete game if finished
   useEffect(() => {
@@ -126,6 +124,14 @@ export function WouldYouRather({ sessionId }: { sessionId: string }) {
   }, [currentState.round, currentState.phase, session, actions]);
 
   if (currentState.phase === 'voting') {
+    const question = currentState.currentQuestion;
+    if (!question) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
       <Card className="animate-slide-up">
         <CardHeader>
@@ -160,9 +166,9 @@ export function WouldYouRather({ sessionId }: { sessionId: string }) {
           ) : (
             <>
               <div className="text-center py-6">
-                <h3 className="text-xl font-semibold mb-6">{currentState.currentQuestion.optionA}</h3>
+                <h3 className="text-xl font-semibold mb-6">{question.optionA}</h3>
                 <div className="text-muted-foreground mb-6">OR</div>
-                <h3 className="text-xl font-semibold">{currentState.currentQuestion.optionB}</h3>
+                <h3 className="text-xl font-semibold">{question.optionB}</h3>
               </div>
 
               <div className="grid grid-cols-2 gap-4">

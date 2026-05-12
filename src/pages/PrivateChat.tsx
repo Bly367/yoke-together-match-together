@@ -289,7 +289,8 @@ const PrivateChat = () => {
       if (attachment) {
         const uploadResult = await uploadAttachmentMutation.mutateAsync({
           file: attachment,
-          folder: 'private-message-attachments',
+          userId: user.id,
+          matchId: conversationId,
         });
         attachmentUrl = uploadResult.url;
         attachmentType = attachment.type;
@@ -348,12 +349,13 @@ const PrivateChat = () => {
     setEditContent(content);
   };
 
-  const handleSaveEdit = async () => {
-    if (!editingMessageId || !user?.id) return;
+  const handleSaveEdit = async (messageId?: string) => {
+    const idToSave = messageId ?? editingMessageId;
+    if (!idToSave || !user?.id) return;
 
     try {
       await editMessageMutation.mutateAsync({
-        messageId: editingMessageId,
+        messageId: idToSave,
         senderId: user.id,
         newContent: editContent,
       });
@@ -569,10 +571,11 @@ const PrivateChat = () => {
             editingMessageId={editingMessageId}
             editContent={editContent}
             onEditChange={setEditContent}
-            onStartEdit={handleStartEdit}
-            onSaveEdit={handleSaveEdit}
+            onStartEdit={(msg) => handleStartEdit(msg.id, msg.content)}
+            onSaveEdit={(id) => void handleSaveEdit(id)}
             onCancelEdit={handleCancelEdit}
             onDelete={handleDelete}
+            isEditingPending={editMessageMutation.isPending}
             containerHeight={containerHeight}
           />
         ) : (
@@ -592,12 +595,19 @@ const PrivateChat = () => {
               messages.map((msg, index) => {
                 const isOwn = msg.sender_id === user?.id;
                 const isEditing = editingMessageId === msg.id;
-                const previousMessage = index > 0 ? messages[index - 1] : null;
-                const nextMessage = index < messages.length - 1 ? messages[index + 1] : null;
+                const toBubbleMessage = (m: (typeof messages)[number]) => ({
+                  ...m,
+                  match_id: m.conversation_id,
+                });
+                const previousMessage = index > 0 ? toBubbleMessage(messages[index - 1]) : null;
+                const nextMessage =
+                  index < messages.length - 1 ? toBubbleMessage(messages[index + 1]) : null;
                 
                 // Show date separator if date changed
-                const showDateSeparator = previousMessage && 
-                  formatDate(previousMessage.created_at) !== formatDate(msg.created_at);
+                const showDateSeparator = Boolean(
+                  previousMessage &&
+                  formatDate(previousMessage.created_at) !== formatDate(msg.created_at)
+                );
                 
                 return (
                   <MessageBubble

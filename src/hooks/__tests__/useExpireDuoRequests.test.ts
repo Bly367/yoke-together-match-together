@@ -3,6 +3,7 @@ import { renderHook } from '@testing-library/react';
 import { useExpireDuoRequests } from '../useExpireDuoRequests';
 import { expireOldRequests } from '@/services/duoRequest.service';
 import { useAuth } from '../useAuth';
+import { logger } from '@/lib/logger';
 
 // Mock dependencies
 vi.mock('@/services/duoRequest.service', () => ({
@@ -134,7 +135,7 @@ describe('useExpireDuoRequests', () => {
       signOut: vi.fn(),
     } as any);
 
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const loggerErrorSpy = vi.spyOn(logger, 'error').mockImplementation(() => {});
     vi.mocked(expireOldRequests).mockRejectedValue(new Error('Expiration failed'));
 
     renderHook(() => useExpireDuoRequests());
@@ -144,13 +145,12 @@ describe('useExpireDuoRequests', () => {
     await vi.runOnlyPendingTimersAsync();
 
     expect(expireOldRequests).toHaveBeenCalled();
-    // Should log error but not throw
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      'Error expiring duo requests:',
+    expect(loggerErrorSpy).toHaveBeenCalledWith(
+      'Error expiring duo requests',
       expect.any(Error)
     );
 
-    consoleErrorSpy.mockRestore();
+    loggerErrorSpy.mockRestore();
   });
 
   it('should prevent concurrent expiration checks', async () => {

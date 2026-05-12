@@ -1,7 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { getUserEmbedding, type UserEmbedding } from './preferenceLearning.service';
 import { computeCosineSimilarity, type EmbeddingVector } from './embedding.service';
-import { getRankingWeights, type RankingWeights } from './abTesting.service';
+import { getRankingWeights } from './abTesting.service';
 import { logger } from '@/lib/logger';
 import type { DuoWithMembers } from './duo.service';
 

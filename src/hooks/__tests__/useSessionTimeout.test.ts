@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import React from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { renderHook, waitFor, act } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useSessionTimeout } from '../useSessionTimeout';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,8 +28,6 @@ describe('useSessionTimeout', () => {
       },
     });
     vi.clearAllMocks();
-    vi.useFakeTimers();
-    
     vi.mocked(useAuth.useAuth).mockReturnValue({
       user: { id: 'user1' } as any,
       isLoading: false,
@@ -42,7 +40,6 @@ describe('useSessionTimeout', () => {
   });
 
   afterEach(() => {
-    vi.useRealTimers();
     vi.restoreAllMocks();
   });
 
@@ -66,14 +63,9 @@ describe('useSessionTimeout', () => {
 
       const { result } = renderHook(() => useSessionTimeout(), { wrapper });
 
-      // Advance timers and wait for async operations
-      await vi.runOnlyPendingTimersAsync();
-      vi.advanceTimersByTime(1000);
-      await vi.runOnlyPendingTimersAsync();
-
       await waitFor(() => {
         expect(result.current.timeUntilExpiry).toBeGreaterThan(0);
-      }, { timeout: 5000 });
+      });
 
       expect(result.current.isExpiring).toBe(false);
     });
@@ -94,14 +86,9 @@ describe('useSessionTimeout', () => {
       const onSessionExpiring = vi.fn();
       const { result } = renderHook(() => useSessionTimeout(onSessionExpiring), { wrapper });
 
-      // Advance timers and wait for async operations
-      await vi.runOnlyPendingTimersAsync();
-      vi.advanceTimersByTime(1000);
-      await vi.runOnlyPendingTimersAsync();
-
       await waitFor(() => {
         expect(result.current.isExpiring).toBe(true);
-      }, { timeout: 5000 });
+      });
 
       expect(onSessionExpiring).toHaveBeenCalled();
     });
@@ -132,17 +119,14 @@ describe('useSessionTimeout', () => {
 
       const { result } = renderHook(() => useSessionTimeout(), { wrapper });
 
-      // Advance timers and wait for async operations
-      await vi.runOnlyPendingTimersAsync();
-      vi.advanceTimersByTime(1000);
-      await vi.runOnlyPendingTimersAsync();
-
       await waitFor(() => {
         expect(result.current.refreshSession).toBeDefined();
-      }, { timeout: 5000 });
+      });
 
       if (result.current.refreshSession) {
-        await result.current.refreshSession();
+        await act(async () => {
+          await result.current.refreshSession!();
+        });
         expect(supabase.auth.refreshSession).toHaveBeenCalled();
       }
     });

@@ -8,7 +8,8 @@ import { useTrackPhotoExpand, useTrackPromptScroll } from '@/hooks/usePreference
 import { useAuth } from '@/hooks/useAuth';
 import { User, Loader2, Heart, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { UserPhoto, UserPrompt } from '@/services/photo.service';
+import type { UserPhoto } from '@/services/photo.service';
+import type { UserPrompt } from '@/services/prompt.service';
 
 interface UserProfileViewProps {
   userId: string;

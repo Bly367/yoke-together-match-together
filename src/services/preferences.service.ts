@@ -92,7 +92,7 @@ export async function getUserPreferences(userId: string): Promise<UserPreference
 
   if (error) {
     // Log error but don't throw for 406 (Not Acceptable) - might be RLS or table issue
-    if (error.code === 'PGRST116' || error.status === 406) {
+    if (error.code === 'PGRST116' || error.message?.includes('406') || (typeof error.details === 'string' && error.details.includes('406'))) {
       // No preferences found or table doesn't exist/not accessible
       return null;
     }

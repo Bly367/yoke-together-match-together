@@ -1,4 +1,4 @@
-import type { GameSession, GameAction } from '../games.service';
+import type { GameAction } from '../games.service';
 
 /**
  * Question for Compatibility Quiz
@@ -181,7 +181,7 @@ export function isCompatibilityQuizComplete(state: CompatibilityQuizState): bool
  */
 export function calculateCompatibilityQuizResults(
   state: CompatibilityQuizState,
-  actions: GameAction[]
+  _actions: GameAction[]
 ): Array<{ user_id: string; final_score: number; rank: number; achievements: string[] }> {
   const playerIds = Object.keys(state.scores);
   const results = playerIds.map(userId => ({

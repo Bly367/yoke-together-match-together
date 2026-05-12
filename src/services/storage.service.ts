@@ -53,7 +53,7 @@ function extractPathFromUrl(url: string, bucketName: string = PHOTOS_BUCKET): st
 export async function uploadPhoto(
   file: File,
   userId: string,
-  path: string = 'photos'
+  _path: string = 'photos'
 ): Promise<string> {
   // Validate file size
   if (file.size > MAX_PHOTO_SIZE) {

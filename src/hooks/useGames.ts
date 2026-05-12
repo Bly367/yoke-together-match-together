@@ -381,7 +381,8 @@ export function useUpdateGameSessionState() {
       currentTurnUserId,
     }: {
       sessionId: string;
-      gameState?: Record<string, unknown>;
+      /** Serialized game engine state (shape varies by game). */
+      gameState?: unknown;
       status?: 'waiting' | 'active' | 'completed' | 'abandoned';
       currentTurnUserId?: string | null;
     }) => updateGameSessionState(sessionId, gameState, status, currentTurnUserId),

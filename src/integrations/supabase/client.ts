@@ -1,5 +1,4 @@
 import { createClient } from '@supabase/supabase-js';
-import type { Database } from './types';
 
 /**
  * Supabase client configuration
@@ -47,12 +46,16 @@ export function getSupabaseConfigError(): string | null {
  * Configured with:
  * - localStorage for session persistence
  * - Auto-refresh token enabled
- * - Typed with Database schema (when types are generated)
- * 
+ *
+ * The client is intentionally **not** parameterized with `Database` from `./types`.
+ * Full PostgREST embed + row typing requires `supabase link` and `npm run types:generate`.
+ * Until then, domain types live on service interfaces; queries stay type-safe at the
+ * application layer via explicit casts where needed.
+ *
  * Note: Client is created even if env vars are missing to prevent module initialization errors.
  * Use isSupabaseConfigured() to check if client is properly configured before use.
  */
-export const supabase = createClient<Database>(
+export const supabase = createClient(
   SUPABASE_URL || 'https://placeholder.supabase.co',
   SUPABASE_PUBLISHABLE_KEY || 'placeholder-key',
   {
@@ -61,5 +64,5 @@ export const supabase = createClient<Database>(
       persistSession: true,
       autoRefreshToken: true,
     },
-  }
+  },
 );

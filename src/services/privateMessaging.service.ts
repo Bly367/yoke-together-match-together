@@ -7,6 +7,8 @@ export interface PrivateConversation {
   id: string;
   user1_id: string;
   user2_id: string;
+  /** Optional display name when the user has renamed the thread */
+  name?: string | null;
   created_at: string;
   updated_at: string;
   last_message_at?: string | null;

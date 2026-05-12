@@ -10,7 +10,6 @@ import { logger } from '@/lib/logger';
 import type { CompatibilityQuizState } from '@/services/games/compatibilityQuiz.service';
 import {
   initializeCompatibilityQuizState,
-  validateCompatibilityQuizAction,
   processCompatibilityQuizAction,
   isCompatibilityQuizComplete,
   calculateCompatibilityQuizResults,
@@ -35,7 +34,7 @@ export function CompatibilityQuiz({ sessionId }: { sessionId: string }) {
 
   const [selectedOption, setSelectedOption] = useState<number>(-1);
 
-  const gameState = (session?.game_state || {}) as CompatibilityQuizState;
+  const gameState = (session?.game_state ?? {}) as unknown as CompatibilityQuizState;
   const playerIds = session?.players?.filter(p => p.is_active).map(p => p.user_id) || [];
   const activePlayers = session?.players?.filter(p => p.is_active) || [];
 
@@ -114,9 +113,6 @@ export function CompatibilityQuiz({ sessionId }: { sessionId: string }) {
   }
 
   const userAnswer = currentState.answers[user?.id || '']?.[currentState.currentQuestion?.id || ''];
-  const allAnswered = playerIds.every(id => 
-    currentState.answers[id]?.[currentState.currentQuestion?.id || ''] !== undefined
-  );
 
   // Complete game if finished
   useEffect(() => {
@@ -130,6 +126,14 @@ export function CompatibilityQuiz({ sessionId }: { sessionId: string }) {
   }, [currentState.round, currentState.phase, session, actions]);
 
   if (currentState.phase === 'answering') {
+    const question = currentState.currentQuestion;
+    if (!question) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
       <Card className="animate-slide-up">
         <CardHeader>
@@ -148,7 +152,7 @@ export function CompatibilityQuiz({ sessionId }: { sessionId: string }) {
               <div className="flex gap-2 justify-center flex-wrap">
                 {playerIds.map((userId) => {
                   const player = activePlayers.find(p => p.user_id === userId);
-                  const hasAnswered = currentState.answers[userId]?.[currentState.currentQuestion?.id || ''] !== undefined;
+                  const hasAnswered = currentState.answers[userId]?.[question.id] !== undefined;
                   return (
                     <Badge
                       key={userId}
@@ -164,11 +168,11 @@ export function CompatibilityQuiz({ sessionId }: { sessionId: string }) {
           ) : (
             <>
               <div className="text-center py-4">
-                <h3 className="text-xl font-semibold mb-6">{currentState.currentQuestion.question}</h3>
+                <h3 className="text-xl font-semibold mb-6">{question.question}</h3>
               </div>
 
               <div className="space-y-2">
-                {currentState.currentQuestion.options.map((option, index) => (
+                {question.options.map((option, index) => (
                   <Button
                     key={index}
                     variant={selectedOption === index ? 'default' : 'outline'}

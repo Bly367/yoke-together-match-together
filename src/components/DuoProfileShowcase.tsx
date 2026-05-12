@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { UserProfileView } from '@/components/UserProfileView';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -42,8 +42,8 @@ export function DuoProfileShowcase({
   const member2Id = duo.member2.id;
   const userIds = [member1Id, member2Id];
 
-  const { data: photosByUser, isLoading: photosLoading } = usePhotosForUsers(userIds);
-  const { data: promptsByUser, isLoading: promptsLoading } = usePromptsForUsers(userIds);
+  const { isLoading: photosLoading } = usePhotosForUsers(userIds);
+  const { isLoading: promptsLoading } = usePromptsForUsers(userIds);
 
   // Track view event
   useEffect(() => {

@@ -10,7 +10,6 @@ import { logger } from '@/lib/logger';
 import type { ThisOrThatState } from '@/services/games/thisOrThat.service';
 import {
   initializeThisOrThatState,
-  validateThisOrThatAction,
   processThisOrThatAction,
   isThisOrThatComplete,
   calculateThisOrThatResults,
@@ -33,7 +32,7 @@ export function ThisOrThat({ sessionId }: { sessionId: string }) {
 
   const [selectedChoice, setSelectedChoice] = useState<'A' | 'B' | null>(null);
 
-  const gameState = (session?.game_state || {}) as ThisOrThatState;
+  const gameState = (session?.game_state ?? {}) as unknown as ThisOrThatState;
   const playerIds = session?.players?.filter(p => p.is_active).map(p => p.user_id) || [];
   const activePlayers = session?.players?.filter(p => p.is_active) || [];
 
@@ -112,7 +111,6 @@ export function ThisOrThat({ sessionId }: { sessionId: string }) {
   }
 
   const userChoice = currentState.choices[user?.id || ''];
-  const allChosen = playerIds.every(id => currentState.choices[id]);
 
   // Complete game if finished
   useEffect(() => {
@@ -126,6 +124,14 @@ export function ThisOrThat({ sessionId }: { sessionId: string }) {
   }, [currentState.round, currentState.phase, session, actions]);
 
   if (currentState.phase === 'choosing') {
+    const question = currentState.currentQuestion;
+    if (!question) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
       <Card className="animate-slide-up">
         <CardHeader>
@@ -164,14 +170,14 @@ export function ThisOrThat({ sessionId }: { sessionId: string }) {
                   'text-3xl font-bold transition-all',
                   selectedChoice === 'A' && 'text-primary scale-110'
                 )}>
-                  {currentState.currentQuestion.optionA}
+                  {question.optionA}
                 </div>
                 <div className="text-2xl text-muted-foreground">VS</div>
                 <div className={cn(
                   'text-3xl font-bold transition-all',
                   selectedChoice === 'B' && 'text-primary scale-110'
                 )}>
-                  {currentState.currentQuestion.optionB}
+                  {question.optionB}
                 </div>
               </div>
 

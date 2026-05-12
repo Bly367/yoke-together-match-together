@@ -47,7 +47,8 @@ export async function getPreferenceAnalytics(
     eventsQuery = eventsQuery.eq('user_id', userId);
   }
 
-  const { data: events = [], error: eventsError } = await eventsQuery;
+  const { data: eventsRaw, error: eventsError } = await eventsQuery;
+  const events = eventsRaw ?? [];
   
   if (eventsError) {
     logger.error('Failed to fetch preference events', { error: eventsError });
@@ -87,7 +88,7 @@ export async function getPreferenceAnalytics(
   });
 
   // Get photo like counts
-  const { data: photoLikes = [], error: photoLikesError } = await supabase
+  const { data: photoLikesRaw, error: photoLikesError } = await supabase
     .from('preference_events')
     .select('target_photo_id')
     .eq('event_type', 'like')
@@ -98,6 +99,7 @@ export async function getPreferenceAnalytics(
     logger.error('Failed to fetch photo likes', { error: photoLikesError });
   }
 
+  const photoLikes = photoLikesRaw ?? [];
   const photoLikeCounts: Record<string, number> = {};
   photoLikes.forEach((like) => {
     if (like.target_photo_id) {
@@ -111,7 +113,7 @@ export async function getPreferenceAnalytics(
     .slice(0, 10);
 
   // Get prompt like counts
-  const { data: promptLikes = [], error: promptLikesError } = await supabase
+  const { data: promptLikesRaw, error: promptLikesError } = await supabase
     .from('preference_events')
     .select('target_prompt_id')
     .eq('event_type', 'like')
@@ -122,6 +124,7 @@ export async function getPreferenceAnalytics(
     logger.error('Failed to fetch prompt likes', { error: promptLikesError });
   }
 
+  const promptLikes = promptLikesRaw ?? [];
   const promptLikeCounts: Record<string, number> = {};
   promptLikes.forEach((like) => {
     if (like.target_prompt_id) {

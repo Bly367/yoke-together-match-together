@@ -10,7 +10,6 @@ import { logger } from '@/lib/logger';
 import type { TriviaChallengeState } from '@/services/games/triviaChallenge.service';
 import {
   initializeTriviaChallengeState,
-  validateTriviaChallengeAction,
   processTriviaChallengeAction,
   isTriviaChallengeComplete,
   calculateTriviaChallengeResults,
@@ -33,7 +32,7 @@ export function TriviaChallenge({ sessionId }: { sessionId: string }) {
 
   const [selectedOption, setSelectedOption] = useState<number>(-1);
 
-  const gameState = (session?.game_state || {}) as TriviaChallengeState;
+  const gameState = (session?.game_state ?? {}) as unknown as TriviaChallengeState;
   const playerIds = session?.players?.filter(p => p.is_active).map(p => p.user_id) || [];
   const activePlayers = session?.players?.filter(p => p.is_active) || [];
 
@@ -112,7 +111,6 @@ export function TriviaChallenge({ sessionId }: { sessionId: string }) {
   }
 
   const userAnswer = currentState.answers[user?.id || ''];
-  const allAnswered = playerIds.every(id => currentState.answers[id] !== undefined);
   const lastResult = currentState.roundResults[currentState.roundResults.length - 1];
   const userWasCorrect = lastResult && userAnswer !== undefined
     ? lastResult.question.correctAnswer === userAnswer
@@ -130,6 +128,14 @@ export function TriviaChallenge({ sessionId }: { sessionId: string }) {
   }, [currentState.round, currentState.phase, session, actions]);
 
   if (currentState.phase === 'answering') {
+    const question = currentState.currentQuestion;
+    if (!question) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </div>
+      );
+    }
     return (
       <Card className="animate-slide-up">
         <CardHeader>
@@ -166,13 +172,13 @@ export function TriviaChallenge({ sessionId }: { sessionId: string }) {
               <div className="space-y-4">
                 <div className="text-center">
                   <Badge variant="outline" className="mb-2">
-                    {currentState.currentQuestion.category}
+                    {question.category}
                   </Badge>
-                  <h3 className="text-xl font-semibold mt-2">{currentState.currentQuestion.question}</h3>
+                  <h3 className="text-xl font-semibold mt-2">{question.question}</h3>
                 </div>
 
                 <div className="space-y-2">
-                  {currentState.currentQuestion.options.map((option, index) => (
+                  {question.options.map((option, index) => (
                     <Button
                       key={index}
                       variant={selectedOption === index ? 'default' : 'outline'}

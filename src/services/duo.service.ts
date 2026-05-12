@@ -9,10 +9,10 @@ export interface Duo {
   id: string;
   member1_id: string;
   member2_id: string;
-  name?: string;
-  tagline?: string;
-  bio?: string;
-  photo_url?: string;
+  name?: string | null;
+  tagline?: string | null;
+  bio?: string | null;
+  photo_url?: string | null;
   interests?: string[];
   is_active: boolean;
   created_at: string;
@@ -29,6 +29,7 @@ export interface DuoWithMembers extends Duo {
     id: string;
     name: string;
     age?: number;
+    bio?: string;
     photo_url?: string;
     gender?: Gender;
     preference?: Preference;
@@ -38,6 +39,7 @@ export interface DuoWithMembers extends Duo {
     id: string;
     name: string;
     age?: number;
+    bio?: string;
     photo_url?: string;
     gender?: Gender;
     preference?: Preference;

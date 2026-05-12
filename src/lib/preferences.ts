@@ -50,10 +50,6 @@ export function preferenceMatchesGender(preference: Preference | undefined, gend
   if (preference === 'both') return true;
   if (preference === 'men' && gender === 'man') return true;
   if (preference === 'women' && gender === 'woman') return true;
-  // Non-binary matches 'both' preference
-  if (gender === 'non-binary' && preference === 'both') return true;
-  // "prefer-not-to-say" matches with "both" preference (most inclusive approach)
-  if (gender === 'prefer-not-to-say' && preference === 'both') return true;
   return false;
 }
 

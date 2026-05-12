@@ -8,7 +8,7 @@
  * List of inappropriate words/phrases (basic example)
  * In production, use a comprehensive list or API service
  */
-const INAPPROPRIATE_WORDS = [
+const INAPPROPRIATE_WORDS: readonly string[] = [
   // Add inappropriate words here - keeping minimal for example
   // In production, use a comprehensive moderation service
 ];

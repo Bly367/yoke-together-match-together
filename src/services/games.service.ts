@@ -471,7 +471,7 @@ export async function leaveGameSession(sessionId: string, userId: string): Promi
   }
 
   // Check if active players < min_players
-  const { data: activePlayers, error: playersError } = await supabase
+  const { count: activePlayerCount, error: playersError } = await supabase
     .from('game_session_players')
     .select('user_id', { count: 'exact', head: true })
     .eq('session_id', sessionId)
@@ -482,10 +482,10 @@ export async function leaveGameSession(sessionId: string, userId: string): Promi
     throw playersError;
   }
 
-  const activePlayerCount = activePlayers || 0;
+  const activeCount = activePlayerCount ?? 0;
   const game = session.game as Game;
 
-  if (activePlayerCount < game.min_players && session.status === 'active') {
+  if (activeCount < game.min_players && session.status === 'active') {
     await supabase
       .from('game_sessions')
       .update({ status: 'abandoned' })
@@ -706,7 +706,7 @@ export async function getGameActions(
  */
 export async function updateGameSessionState(
   sessionId: string,
-  gameState?: Record<string, unknown>,
+  gameState?: unknown,
   status?: GameSessionStatus,
   currentTurnUserId?: string | null
 ): Promise<GameSession> {
@@ -721,7 +721,7 @@ export async function updateGameSessionState(
       .maybeSingle();
 
     const currentState = (currentSession?.game_state as Record<string, unknown>) || {};
-    updates.game_state = { ...currentState, ...gameState };
+    updates.game_state = { ...currentState, ...(gameState as Record<string, unknown>) };
   }
 
   if (status !== undefined) {
@@ -853,7 +853,7 @@ export function subscribeToGameSession(
         table: 'game_sessions',
         filter: `id=eq.${sessionId}`,
       },
-      async (payload) => {
+      async (_payload) => {
         // Fetch full session with related data
         const session = await getGameSession(sessionId);
         if (session) {

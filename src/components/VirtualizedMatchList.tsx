@@ -1,5 +1,5 @@
 import { useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { List } from 'react-window';
+import { VariableSizeList } from 'react-window';
 import { formatTime, formatRelativeTime, getOtherDuo, getMatchName } from '@/lib/utils';
 import { User } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -138,7 +138,7 @@ export function VirtualizedMatchList({
   onMatchClick,
   containerHeight,
 }: VirtualizedMatchListProps) {
-  const listRef = useRef<List>(null);
+  const listRef = useRef<VariableSizeList>(null);
   const itemHeightsRef = useRef<Map<number, number>>(new Map());
 
   // Estimate item height (will be adjusted based on actual rendered height)
@@ -170,29 +170,22 @@ export function VirtualizedMatchList({
     setItemSize,
   }), [matches, currentUserId, onMatchClick, getItemSize, setItemSize]);
 
-  // Row renderer for react-window
-  const Row = useCallback(
-    ({ index, style }: { index: number; style: React.CSSProperties }) => (
-      <MatchRow index={index} style={style} data={rowData} />
-    ),
-    [rowData]
-  );
-
   if (matches.length === 0) {
     return null;
   }
 
   return (
-    <List
+    <VariableSizeList
       ref={listRef}
       height={containerHeight}
       itemCount={matches.length}
       itemSize={getItemSize}
+      itemData={rowData}
       width="100%"
       overscanCount={5}
     >
-      {Row}
-    </List>
+      {MatchRow}
+    </VariableSizeList>
   );
 }
 
