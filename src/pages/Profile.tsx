@@ -1,6 +1,7 @@
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Settings, LogOut, Loader2, User, Users, Mail, Bell, Sliders } from "lucide-react";
+import { ArrowLeft, Settings, LogOut, Loader2, User, Users, Mail, Bell, Sliders, Camera, Sparkles, ChevronDown, ChevronUp } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { useUserDuos, useActiveDuo, useSetActiveDuo, useDeleteDuo } from "@/hooks/useDuos";
@@ -11,6 +12,8 @@ import { LocationPrivacyToggle } from "@/components/LocationPrivacyToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { OptimizedImage } from "@/components/OptimizedImage";
 import { ProfileCompleteness } from "@/components/ProfileCompleteness";
+import { PhotoGalleryUpload } from "@/components/PhotoGalleryUpload";
+import { PromptManager } from "@/components/PromptManager";
 
 const Profile = () => {
   const navigate = useNavigate();
@@ -21,6 +24,8 @@ const Profile = () => {
   const deleteDuoMutation = useDeleteDuo();
   const leaveDuoMutation = useLeaveDuo();
   const { data: pendingRequests = [] } = usePendingRequests();
+  const [showPhotoGallery, setShowPhotoGallery] = useState(false);
+  const [showPrompts, setShowPrompts] = useState(false);
 
   const handleSetActiveDuo = async (duoId: string) => {
     try {
@@ -307,6 +312,72 @@ const Profile = () => {
             </div>
           )}
         </div>
+
+        {/* Photo Gallery - Hinge-style multi-photo */}
+        {user && (
+          <div className="bg-card rounded-3xl p-6 shadow-[var(--shadow-card)] animate-slide-up">
+            <button
+              type="button"
+              onClick={() => setShowPhotoGallery((v) => !v)}
+              className="w-full flex items-center justify-between"
+              aria-expanded={showPhotoGallery}
+              aria-controls="profile-photo-gallery"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yolk-yellow to-yolk-peach flex items-center justify-center shadow-[var(--shadow-soft)]">
+                  <Camera className="w-5 h-5 text-foreground" aria-hidden="true" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-semibold text-foreground">Photo Gallery</h3>
+                  <p className="text-sm text-muted-foreground">Manage up to 9 photos</p>
+                </div>
+              </div>
+              {showPhotoGallery ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              )}
+            </button>
+            {showPhotoGallery && (
+              <div id="profile-photo-gallery" className="mt-6">
+                <PhotoGalleryUpload userId={user.id} maxPhotos={9} minPhotos={3} />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Prompts - Hinge-style personality answers */}
+        {user && (
+          <div className="bg-card rounded-3xl p-6 shadow-[var(--shadow-card)] animate-slide-up">
+            <button
+              type="button"
+              onClick={() => setShowPrompts((v) => !v)}
+              className="w-full flex items-center justify-between"
+              aria-expanded={showPrompts}
+              aria-controls="profile-prompts"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yolk-yellow to-yolk-peach flex items-center justify-center shadow-[var(--shadow-soft)]">
+                  <Sparkles className="w-5 h-5 text-foreground" aria-hidden="true" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-lg font-semibold text-foreground">Prompts</h3>
+                  <p className="text-sm text-muted-foreground">Share your personality</p>
+                </div>
+              </div>
+              {showPrompts ? (
+                <ChevronUp className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-muted-foreground" aria-hidden="true" />
+              )}
+            </button>
+            {showPrompts && (
+              <div id="profile-prompts" className="mt-6">
+                <PromptManager userId={user.id} maxPrompts={3} minPrompts={3} />
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Location Privacy */}
         <div className="bg-card rounded-3xl p-6 shadow-[var(--shadow-card)] animate-slide-up">

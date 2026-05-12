@@ -7,9 +7,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import chickMascot from "@/assets/chick-mascot.png";
-import { Loader2 } from "lucide-react";
+import { Loader2, Camera, Sparkles } from "lucide-react";
 import { useAuth, useUpdateProfile } from "@/hooks/useAuth";
 import { PhotoUpload } from "@/components/PhotoUpload";
+import { PhotoGalleryUpload } from "@/components/PhotoGalleryUpload";
+import { PromptManager } from "@/components/PromptManager";
 import { ROUTES } from "@/lib/routes";
 import type { Gender, Preference } from "@/services/auth.service";
 
@@ -252,6 +254,42 @@ const ProfileSetup = () => {
             </Button>
           </form>
         </div>
+
+        {/* Photo Gallery - Hinge-style multi-photo support */}
+        {user && (
+          <div className="bg-card rounded-3xl shadow-[var(--shadow-card)] p-8 space-y-4 mt-6 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yolk-yellow to-yolk-peach flex items-center justify-center shadow-[var(--shadow-soft)]">
+                <Camera className="w-5 h-5 text-foreground" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Your Photo Gallery</h2>
+                <p className="text-sm text-muted-foreground">
+                  Add up to 9 photos so matches can see more of you
+                </p>
+              </div>
+            </div>
+            <PhotoGalleryUpload userId={user.id} maxPhotos={9} minPhotos={3} />
+          </div>
+        )}
+
+        {/* Prompts - Hinge-style getting-to-know-you answers */}
+        {user && (
+          <div className="bg-card rounded-3xl shadow-[var(--shadow-card)] p-8 space-y-4 mt-6 animate-slide-up">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-yolk-yellow to-yolk-peach flex items-center justify-center shadow-[var(--shadow-soft)]">
+                <Sparkles className="w-5 h-5 text-foreground" aria-hidden="true" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-foreground">Your Prompts</h2>
+                <p className="text-sm text-muted-foreground">
+                  Pick a few prompts to give matches a peek at your personality
+                </p>
+              </div>
+            </div>
+            <PromptManager userId={user.id} maxPrompts={3} minPrompts={3} />
+          </div>
+        )}
       </div>
     </div>
   );
