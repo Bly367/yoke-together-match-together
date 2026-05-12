@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useMemo } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Send, User, Loader2, Paperclip, X as XIcon, File, Edit2, LogOut, MoreVertical, Gamepad2 } from "lucide-react";
+import { ArrowLeft, Send, User, Loader2, Paperclip, X as XIcon, File, Edit2, LogOut, MoreVertical, Gamepad2, UserCircle } from "lucide-react";
 import { toast } from "sonner";
 import { useAuth } from "@/hooks/useAuth";
 import { 
@@ -42,6 +42,7 @@ import { formatDate } from "@/lib/utils";
 import { useViewing } from "@/contexts/ViewingContext";
 import { logger } from "@/lib/logger";
 import { GamesDialog } from "@/components/games/GamesDialog";
+import { DuoProfileShowcase } from "@/components/DuoProfileShowcase";
 
 const MAX_MESSAGE_LENGTH = 1000;
 
@@ -98,6 +99,9 @@ const ChatComponent = () => {
   
   // Games dialog state
   const [isGamesDialogOpen, setIsGamesDialogOpen] = useState(false);
+
+  // Duo profile showcase (multi-photo + prompts view of the other duo)
+  const [isProfileDialogOpen, setIsProfileDialogOpen] = useState(false);
 
   // Subscribe to new messages
   useMessageSubscription(matchId || null, true);
@@ -618,6 +622,10 @@ const ChatComponent = () => {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => setIsProfileDialogOpen(true)}>
+                        <UserCircle className="w-4 h-4 mr-2" />
+                        View Profile
+                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setIsGamesDialogOpen(true)}>
                         <Gamepad2 className="w-4 h-4 mr-2" />
                         Games
@@ -740,6 +748,27 @@ const ChatComponent = () => {
           open={isGamesDialogOpen}
           onOpenChange={setIsGamesDialogOpen}
         />
+      )}
+
+      {/* Duo Profile Showcase Dialog - Hinge-style multi-photo + prompts view */}
+      {otherDuo && (
+        <Dialog open={isProfileDialogOpen} onOpenChange={setIsProfileDialogOpen}>
+          <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto p-0">
+            <DialogHeader className="sr-only">
+              <DialogTitle>
+                {otherDuo.name || `${otherDuo.member1?.name ?? 'Member 1'} & ${otherDuo.member2?.name ?? 'Member 2'}`} profile
+              </DialogTitle>
+              <DialogDescription>
+                Full duo profile with photos and prompts
+              </DialogDescription>
+            </DialogHeader>
+            <DuoProfileShowcase
+              duo={otherDuo}
+              onClose={() => setIsProfileDialogOpen(false)}
+              className="!min-h-0"
+            />
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Messages */}
